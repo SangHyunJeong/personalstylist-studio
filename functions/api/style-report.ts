@@ -49,6 +49,9 @@ const jsonResponse = (
   status: number,
 ) => Response.json(body, { status })
 
+const isKoreanLocale = (preferredLocale?: string) =>
+  preferredLocale?.toLowerCase().startsWith('ko') ?? false
+
 const parseGeminiResponse = async (response: Response) => {
   const rawText = await response.text()
   return rawText.trim()
@@ -120,12 +123,17 @@ const extractImage = (parts: GeminiPart[] = []) => {
 const getFriendlyTextError = (
   status: number,
   message: string | undefined,
+  preferredLocale?: string,
 ) => {
   if (status === 429) {
-    return '현재 Gemini API 키의 사용 한도 또는 결제 설정 문제로 보고서를 생성할 수 없습니다. Google AI Studio에서 quota와 billing 상태를 확인해 주세요.'
+    return isKoreanLocale(preferredLocale)
+      ? '현재 Gemini API 키의 사용 한도 또는 결제 설정 문제로 보고서를 생성할 수 없습니다. Google AI Studio에서 quota와 billing 상태를 확인해 주세요.'
+      : 'The style report could not be generated because of the current Gemini API quota or billing status. Please check quota and billing in Google AI Studio.'
   }
 
-  return message ?? 'Gemini API 호출 중 오류가 발생했습니다.'
+  return message ?? (isKoreanLocale(preferredLocale)
+    ? 'Gemini API 호출 중 오류가 발생했습니다.'
+    : 'An error occurred while calling the Gemini API.')
 }
 
 const buildReportPrompt = ({
@@ -138,22 +146,22 @@ const buildReportPrompt = ({
   preferredLocale?: string
 }) =>
   [
-    '당신은 프리미엄 퍼스널 스타일리스트입니다.',
-    '사용자의 사진과 체형 정보를 바탕으로 스타일 컨설팅 보고서를 작성하세요.',
-    '사용자의 선호 언어를 기준으로 보고서를 작성하세요.',
-    'locale이 ko로 시작하면 한국어, ja로 시작하면 일본어, zh로 시작하면 중국어, 그 외에는 영어로 답변하세요.',
-    '추측을 단정적으로 말하지 말고, 사진 기반 관찰과 스타일 제안을 구분해 표현하세요.',
-    '각 섹션은 너무 길지 않게 2~4문장 또는 2~4개 bullet로 간결하게 작성하세요.',
-    '다음 구조를 반드시 끝까지 완성하세요.',
-    '1. 한줄 총평',
-    '2. 체형 및 인상 분석',
-    '3. 잘 어울리는 핏과 실루엣',
-    '4. 추천 코디 3가지',
-    '5. 피하면 좋은 스타일',
-    '6. 바로 쇼핑할 아이템 5개',
-    `사용자 locale: ${preferredLocale || 'en-US'}`,
-    `입력된 키: ${height}cm`,
-    `입력된 몸무게: ${weight}kg`,
+    'You are an AI styling software assistant.',
+    'Analyze the user photo and body information to generate a digital style report.',
+    'Write the report in the user preferred language.',
+    'If locale starts with ko, respond in Korean. If ja, Japanese. If zh, Chinese. Otherwise, respond in English.',
+    'Separate observations from suggestions, and avoid presenting uncertain traits as facts.',
+    'Keep each section concise: 2-4 sentences or 2-4 bullets.',
+    'Complete the following structure in full.',
+    '1. One-line summary',
+    '2. Body shape and impression analysis',
+    '3. Recommended fits and silhouettes',
+    '4. Three outfit directions',
+    '5. Styles to avoid',
+    '6. Five items to shop next',
+    `User locale: ${preferredLocale || 'en-US'}`,
+    `Height: ${height}cm`,
+    `Weight: ${weight}kg`,
   ].join('\n')
 
 const buildStyleImagePrompt = ({
@@ -215,6 +223,7 @@ const generateText = async ({
       getFriendlyTextError(
         response.status,
         json?.error?.message,
+        preferredLocale,
       ),
     )
   }
@@ -233,7 +242,7 @@ export async function onRequestPost(context: PagesContext) {
   try {
     if (!env.GEMINI_API_KEY) {
       return jsonResponse(
-        { error: 'Cloudflare Pages 환경변수 GEMINI_API_KEY가 설정되지 않았습니다.' },
+        { error: 'Cloudflare Pages environment variable GEMINI_API_KEY is not set.' },
         500,
       )
     }
@@ -249,14 +258,21 @@ export async function onRequestPost(context: PagesContext) {
     try {
       body = await request.json()
     } catch {
-      return jsonResponse({ error: '요청 본문을 읽을 수 없습니다.' }, 400)
+      return jsonResponse(
+        { error: 'Unable to read the request body.' },
+        400,
+      )
     }
 
     const { height, weight, imageBase64, mimeType, preferredLocale } = body
 
     if (!height || !weight || !imageBase64 || !mimeType) {
       return jsonResponse(
-        { error: '사진, 키, 몸무게 정보를 모두 전달해야 합니다.' },
+        {
+          error: isKoreanLocale(preferredLocale)
+            ? '사진, 키, 몸무게 정보를 모두 전달해야 합니다.'
+            : 'Photo, height, and weight are all required.',
+        },
         400,
       )
     }
@@ -279,9 +295,9 @@ export async function onRequestPost(context: PagesContext) {
     if (initialResult.finishReason === 'MAX_TOKENS' && report) {
       const continuationPrompt = [
         reportPrompt,
-        '이전 답변이 토큰 제한으로 중간에 끊겼습니다.',
-        '아래까지 이미 작성한 내용은 반복하지 말고, 끊긴 지점부터 나머지 섹션을 끝까지 이어서 완성하세요.',
-        '이미 작성된 내용:',
+        'The previous answer was cut off by the token limit.',
+        'Do not repeat the existing content. Continue from the interruption point and finish the remaining sections.',
+        'Already written content:',
         report,
       ].join('\n\n')
 
@@ -297,7 +313,11 @@ export async function onRequestPost(context: PagesContext) {
 
     if (!report) {
       return jsonResponse(
-        { error: 'Gemini 응답에서 스타일 보고서를 찾을 수 없습니다.' },
+        {
+          error: isKoreanLocale(preferredLocale)
+            ? 'Gemini 응답에서 스타일 보고서를 찾을 수 없습니다.'
+            : 'The Gemini response did not contain a style report.',
+        },
         502,
       )
     }
@@ -351,8 +371,12 @@ export async function onRequestPost(context: PagesContext) {
       prompt: styleImagePrompt,
       note:
         lastImageStatus === 429
-          ? '스타일 이미지 생성은 현재 한도 또는 결제 상태 때문에 건너뛰고, 외부 생성형 AI에 붙여넣을 프롬프트만 제공했습니다.'
-          : '스타일 이미지 생성은 완료하지 못해, 외부 생성형 AI에 붙여넣을 프롬프트만 제공했습니다.',
+          ? isKoreanLocale(preferredLocale)
+            ? '스타일 이미지 생성은 현재 한도 또는 결제 상태 때문에 건너뛰고, 외부 생성형 AI에 붙여넣을 프롬프트만 제공했습니다.'
+            : 'Style image generation was skipped because of the current quota or billing status, so only a prompt for your external AI tool was provided.'
+          : isKoreanLocale(preferredLocale)
+            ? '스타일 이미지 생성은 완료하지 못해, 외부 생성형 AI에 붙여넣을 프롬프트만 제공했습니다.'
+            : 'Style image generation could not be completed, so only a prompt for your external AI tool was provided.',
     })
   } catch (error) {
     return jsonResponse(
@@ -360,7 +384,7 @@ export async function onRequestPost(context: PagesContext) {
         error:
           error instanceof Error
             ? error.message
-            : '스타일 보고서를 생성하는 중 서버 오류가 발생했습니다.',
+            : 'A server error occurred while generating the style report.',
       },
       500,
     )

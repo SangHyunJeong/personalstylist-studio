@@ -45,6 +45,9 @@ const jsonResponse = (
 ) =>
   Response.json(body, { status })
 
+const isKoreanLocale = (preferredLocale?: string) =>
+  preferredLocale?.toLowerCase().startsWith('ko') ?? false
+
 const parseGeminiResponse = async (response: Response) => {
   const rawText = await response.text()
   return rawText.trim()
@@ -117,33 +120,33 @@ const extractImage = (parts: GeminiPart[] = []) => {
 
 const buildHairImagePrompt = (preferredLocale?: string) =>
   [
-    '너는 최고의 헤어스타일리스트야.',
-    '3x3 그리드로, 첨부한 사진 속 사람에게 최고로 잘 어울리는 헤어스타일 9개를 생성해줘.',
-    '단, 첨부한 사람의 얼굴은 절대 바꾸지 말고 기존 얼굴을 그대로 유지하고 헤어스타일만 바꿔.',
-    '헤어 길이, 질감, 가르마, 볼륨, 무드가 서로 뚜렷하게 다른 9개를 만들어줘.',
-    '하나의 완성된 3x3 콜라주 이미지로 만들어줘.',
-    '이미지와 함께 각 스타일 9개에 대한 짧은 설명도 작성해줘.',
-    '설명은 사용자의 locale을 따르되, ko면 한국어, ja면 일본어, zh면 중국어, 그 외에는 영어로 작성해줘.',
-    `사용자 locale: ${preferredLocale || 'en-US'}`,
+    'You are an AI hairstyle generation assistant.',
+    'Create a 3x3 grid with nine hairstyle options that suit the person in the attached photo.',
+    'Do not change the face. Keep the same identity, facial structure, and expression, and change the hair only.',
+    'Make the nine hairstyles clearly different in length, texture, parting, fringe, volume, and overall mood.',
+    'Return one finished 3x3 collage image.',
+    'Also include short descriptions for all nine styles.',
+    'Write the descriptions in the user preferred language: Korean for ko, Japanese for ja, Chinese for zh, otherwise English.',
+    `User locale: ${preferredLocale || 'en-US'}`,
   ].join('\n')
 
 const buildHairFallbackPromptRequest = (preferredLocale?: string) =>
   [
-    '너는 최고의 헤어스타일리스트야.',
-    '사용자가 ChatGPT, Gemini, Nano Banana 같은 외부 이미지 생성 도구에 바로 붙여넣어 사용할 수 있는 프롬프트를 작성해줘.',
-    '반드시 두 가지를 작성해줘.',
-    '1. 첨부 사진 속 인물의 얼굴은 그대로 유지하고 헤어스타일만 바꾸는 3x3 그리드 생성용 메인 프롬프트 1개',
-    '2. 9개 헤어스타일 각각에 대한 짧은 추천 설명',
-    '프롬프트에는 얼굴 변경 금지, identity preservation, hair only change, 3x3 collage, realistic photo quality를 분명하게 포함해.',
-    '설명은 사용자의 locale을 따르되, ko면 한국어, ja면 일본어, zh면 중국어, 그 외에는 영어로 작성해줘.',
-    '출력 형식은 다음을 지켜줘.',
-    '**추천 요약**',
-    '짧은 요약 2~3문장',
-    '**복사용 프롬프트**',
-    '외부 툴에 붙여넣을 수 있는 완성 프롬프트',
-    '**9개 스타일 설명**',
-    '1번부터 9번까지 각 스타일 설명',
-    `사용자 locale: ${preferredLocale || 'en-US'}`,
+    'You are an AI hairstyle prompt generator.',
+    'Write content that the user can paste directly into an external image generation tool like ChatGPT or Gemini.',
+    'Include two parts.',
+    '1. One main prompt for a 3x3 hairstyle grid that keeps the same face and changes only the hair.',
+    '2. Short recommendation text for each of the nine hairstyles.',
+    'The prompt must explicitly mention identity preservation, same face, hair only change, 3x3 collage, and realistic photo quality.',
+    'Write the response in the user preferred language: Korean for ko, Japanese for ja, Chinese for zh, otherwise English.',
+    'Use this output format exactly.',
+    '**Recommendation Summary**',
+    'A short 2-3 sentence summary',
+    '**Copy Prompt**',
+    'One complete prompt ready to paste into an external tool',
+    '**Nine Style Notes**',
+    'Descriptions for styles 1 through 9',
+    `User locale: ${preferredLocale || 'en-US'}`,
   ].join('\n')
 
 const buildHairExternalPrompt = ({
@@ -170,20 +173,20 @@ const buildHairExternalPrompt = ({
 
 const buildGenericHairFallbackPromptRequest = (preferredLocale?: string) =>
   [
-    '너는 최고의 헤어스타일리스트야.',
-    '사용자가 외부 이미지 생성 도구에 바로 붙여넣을 수 있는 고품질 프롬프트를 작성해줘.',
-    '입력 사진의 얼굴은 그대로 유지하고, 헤어스타일만 바꾸는 3x3 콜라주용 프롬프트를 작성해줘.',
-    '프롬프트에는 identity preservation, same face, same facial features, hair only change, 3x3 collage, photorealistic, salon recommendation을 분명하게 넣어줘.',
-    '또한 9개의 추천 헤어스타일 이름과 특징을 함께 작성해줘.',
-    '설명은 사용자의 locale을 따르되, ko면 한국어, ja면 일본어, zh면 중국어, 그 외에는 영어로 작성해줘.',
-    '출력 형식은 다음을 지켜줘.',
-    '**추천 요약**',
-    '짧은 요약 2~3문장',
-    '**복사용 프롬프트**',
-    '외부 툴에 붙여넣을 수 있는 완성 프롬프트',
-    '**9개 스타일 설명**',
-    '1번부터 9번까지 각 스타일 설명',
-    `사용자 locale: ${preferredLocale || 'en-US'}`,
+    'You are an AI hairstyle prompt generator.',
+    'Write a high-quality prompt the user can paste into an external image generation tool.',
+    'The prompt must keep the same face from the source photo and change the hair only in a 3x3 collage.',
+    'Explicitly include identity preservation, same face, same facial features, hair only change, 3x3 collage, photorealistic quality, and salon-style recommendation language.',
+    'Also provide names and characteristics for nine recommended hairstyles.',
+    'Write the response in the user preferred language: Korean for ko, Japanese for ja, Chinese for zh, otherwise English.',
+    'Use this output format exactly.',
+    '**Recommendation Summary**',
+    'A short 2-3 sentence summary',
+    '**Copy Prompt**',
+    'One complete prompt ready to paste into an external tool',
+    '**Nine Style Notes**',
+    'Descriptions for styles 1 through 9',
+    `User locale: ${preferredLocale || 'en-US'}`,
   ].join('\n')
 
 export async function onRequestPost(context: PagesContext) {
@@ -192,7 +195,9 @@ export async function onRequestPost(context: PagesContext) {
   try {
     if (!env.GEMINI_API_KEY) {
       return jsonResponse(
-        { error: 'Cloudflare Pages 환경변수 GEMINI_API_KEY가 설정되지 않았습니다.' },
+        {
+          error: 'Cloudflare Pages environment variable GEMINI_API_KEY is not set.',
+        },
         500,
       )
     }
@@ -206,13 +211,25 @@ export async function onRequestPost(context: PagesContext) {
     try {
       body = await request.json()
     } catch {
-      return jsonResponse({ error: '요청 본문을 읽을 수 없습니다.' }, 400)
+      return jsonResponse(
+        {
+          error: 'Unable to read the request body.',
+        },
+        400,
+      )
     }
 
     const { imageBase64, mimeType, preferredLocale } = body
 
     if (!imageBase64 || !mimeType) {
-      return jsonResponse({ error: '헤어스타일 추천용 사진이 필요합니다.' }, 400)
+      return jsonResponse(
+        {
+          error: isKoreanLocale(preferredLocale)
+            ? '헤어스타일 추천용 사진이 필요합니다.'
+            : 'A photo is required for the hairstyle recommendation.',
+        },
+        400,
+      )
     }
 
     const imagePrompt = buildHairImagePrompt(preferredLocale)
@@ -253,12 +270,18 @@ export async function onRequestPost(context: PagesContext) {
           })
         }
 
-        lastImageErrorMessage = 'Gemini 응답에서 헤어스타일 이미지 결과를 완성하지 못했습니다.'
+        lastImageErrorMessage = isKoreanLocale(preferredLocale)
+          ? 'Gemini 응답에서 헤어스타일 이미지 결과를 완성하지 못했습니다.'
+          : 'The Gemini response did not complete the hairstyle image result.'
         shouldFallbackToPrompt = true
         break
       }
 
-      lastImageErrorMessage = json?.error?.message ?? 'Gemini 이미지 생성 호출 중 오류가 발생했습니다.'
+      lastImageErrorMessage = json?.error?.message ?? (
+        isKoreanLocale(preferredLocale)
+          ? 'Gemini 이미지 생성 호출 중 오류가 발생했습니다.'
+          : 'An error occurred while calling Gemini image generation.'
+      )
 
       if (response.status === 429) {
         shouldFallbackToPrompt = true
@@ -296,8 +319,12 @@ export async function onRequestPost(context: PagesContext) {
             styleSummary: description,
           }),
           note: shouldFallbackToPrompt
-            ? '이미지 생성 한도 문제로 텍스트 프롬프트 추천으로 전환했습니다.'
-            : '이미지 결과를 완성하지 못해 텍스트 프롬프트 추천으로 전환했습니다.',
+            ? isKoreanLocale(preferredLocale)
+              ? '이미지 생성 한도 문제로 텍스트 프롬프트 추천으로 전환했습니다.'
+              : 'Image generation hit a limit, so the result was switched to a text prompt recommendation.'
+            : isKoreanLocale(preferredLocale)
+              ? '이미지 결과를 완성하지 못해 텍스트 프롬프트 추천으로 전환했습니다.'
+              : 'The image result could not be completed, so the result was switched to a text prompt recommendation.',
         })
       }
     }
@@ -322,7 +349,9 @@ export async function onRequestPost(context: PagesContext) {
             preferredLocale,
             styleSummary: description,
           }),
-          note: '이미지 생성 한도 또는 이미지 처리 문제로 텍스트 프롬프트 추천으로 전환했습니다.',
+          note: isKoreanLocale(preferredLocale)
+            ? '이미지 생성 한도 또는 이미지 처리 문제로 텍스트 프롬프트 추천으로 전환했습니다.'
+            : 'Image generation was switched to a text prompt recommendation because of a limit or image processing issue.',
         })
       }
     }
@@ -331,7 +360,9 @@ export async function onRequestPost(context: PagesContext) {
       {
         error:
           lastImageErrorMessage ||
-          '헤어스타일 추천을 생성하는 중 문제가 발생했습니다.',
+          (isKoreanLocale(preferredLocale)
+            ? '헤어스타일 추천을 생성하는 중 문제가 발생했습니다.'
+            : 'An issue occurred while generating the hairstyle recommendation.'),
       },
       500,
     )
@@ -341,7 +372,9 @@ export async function onRequestPost(context: PagesContext) {
         error:
           error instanceof Error
             ? error.message
-            : '헤어스타일 추천을 생성하는 중 서버 오류가 발생했습니다.',
+            : isKoreanLocale(undefined)
+              ? '헤어스타일 추천을 생성하는 중 서버 오류가 발생했습니다.'
+              : 'A server error occurred while generating the hairstyle recommendation.',
       },
       500,
     )

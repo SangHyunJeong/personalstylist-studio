@@ -28,6 +28,7 @@ type HairRecommendationResponse = {
 }
 
 type Theme = 'light' | 'dark'
+type Language = 'ko' | 'en'
 type View = 'home' | 'style' | 'hair'
 
 const homeStyleImage =
@@ -52,6 +53,22 @@ const getInitialTheme = (): Theme => {
     : 'light'
 }
 
+const getInitialLanguage = (): Language => {
+  if (typeof window === 'undefined') {
+    return 'en'
+  }
+
+  const storedLanguage = window.localStorage.getItem('language')
+
+  if (storedLanguage === 'ko' || storedLanguage === 'en') {
+    return storedLanguage
+  }
+
+  return window.navigator.language.toLowerCase().startsWith('ko')
+    ? 'ko'
+    : 'en'
+}
+
 const getInitialView = (): View => {
   if (typeof window === 'undefined') {
     return 'home'
@@ -65,6 +82,153 @@ const getInitialView = (): View => {
 
   return 'home'
 }
+
+const localeCopy = {
+  ko: {
+    languageLabel: 'Language',
+    korean: '한국어',
+    english: 'English',
+    noImageSelected: '아직 선택된 이미지가 없습니다.',
+    copySuccess: '프롬프트를 클립보드에 복사했습니다.',
+    copyFailure: '클립보드 복사에 실패했습니다. 직접 선택해서 복사해 주세요.',
+    encodeFailure: '이미지 인코딩에 실패했습니다.',
+    imageDataMissing: '이미지 데이터를 읽을 수 없습니다.',
+    imageReadFailure: '이미지 파일을 읽는 중 오류가 발생했습니다.',
+    responseParseFailure: '서버 응답을 해석하지 못했습니다.',
+    imageOnlyFailure: '이미지 파일만 업로드할 수 있습니다.',
+    stylePhotoRequired: '스타일 분석을 위해 본인 사진을 업로드해 주세요.',
+    styleMetricsRequired: '키와 몸무게를 모두 입력해 주세요.',
+    styleSubmitError: '스타일 보고서를 생성하지 못했습니다.',
+    styleFetchError: '스타일 보고서를 가져오는 중 문제가 발생했습니다.',
+    hairPhotoRequired: '헤어스타일 추천을 위해 본인 사진을 업로드해 주세요.',
+    hairSubmitError: '헤어스타일 추천 이미지를 생성하지 못했습니다.',
+    hairFetchError: '헤어스타일 추천 이미지를 가져오는 중 문제가 발생했습니다.',
+    topbarStyle: '체형 스타일 보고서',
+    topbarHair: '퍼스널 스타일리스트',
+    homeTitleLead: '원하는 스타일 추천을',
+    homeTitleAccent: '먼저 선택하세요.',
+    homeDescription:
+      'AI 소프트웨어가 자동으로 생성하는 디지털 스타일링 결과를, 체형 분석과 헤어 추천 흐름으로 나눠서 받아볼 수 있습니다.',
+    complianceTitle: '디지털 전용 AI 스타일링 소프트웨어',
+    complianceBody:
+      '이 서비스는 사람 상담이나 오프라인 제공 없이, 이미지와 텍스트 같은 디지털 결과만 자동 생성합니다.',
+    homeStyleTitle: '체형 스타일 보고서',
+    homeStyleDescription:
+      '체형과 인상을 바탕으로 실루엣, 코디, 아이템을 자동 정리한 디지털 스타일 보고서를 생성합니다.',
+    homeStyleCta: '분석 시작하기',
+    homeHairTitle: '헤어스타일링 추천',
+    homeHairDescription:
+      '얼굴은 그대로 유지한 채, 잘 어울리는 헤어스타일 9가지를 3x3 이미지로 추천합니다.',
+    homeHairCta: '헤어 추천 보기',
+    styleUploadTitle: '전신 사진 업로드',
+    styleUploadHelper: '드래그 앤 드롭하거나 클릭해서 사진을 선택하세요',
+    styleUploadSelect: '이미지 선택',
+    styleHeight: '키 (cm)',
+    styleWeight: '몸무게 (kg)',
+    styleHeightPlaceholder: '예: 175',
+    styleWeightPlaceholder: '예: 70',
+    styleAction: '분석 생성하기',
+    styleActionLoading: '스타일 보고서 생성 중...',
+    stylePanelTag: 'AI 스타일 보고서',
+    stylePanelTitle: 'AI 자동 스타일 보고서',
+    styleEmpty:
+      '사진과 체형 정보를 입력하면 스타일 보고서와 착장 방향이 여기에 표시됩니다.',
+    styleVisualTitle: '추천 착장 이미지',
+    stylePromptTitle: 'AI 프롬프트 유틸리티',
+    stylePromptDescription:
+      'ChatGPT, Gemini, Stitch 같은 생성형 AI에서 추가 룩 이미지를 만들 수 있도록 프롬프트를 복사합니다.',
+    hairUploadTitle: '내 사진 업로드',
+    hairUploadHelper:
+      '드래그 앤 드롭하거나 탭해서 선명한 인물 사진을 업로드하세요.',
+    hairAction: '내 스타일 분석하기',
+    hairActionLoading: '헤어스타일 추천 생성 중...',
+    hairPanelTag: 'AI 헤어 스타일리스트',
+    hairPanelTitle: '3x3 헤어스타일 추천',
+    hairEmpty:
+      '사진을 업로드하면 3x3 헤어스타일 추천 이미지와 설명이 여기에 표시됩니다.',
+    hairPromptTitle: '생성형 AI 프롬프트',
+    hairPromptDescription:
+      'ChatGPT, Gemini 또는 다른 이미지 생성 도구에서 다시 시도할 수 있도록 프롬프트를 복사합니다.',
+    utilityButton: '내 생성형 AI로 가져가서 이미지 생성할 프롬프트 복사하기',
+    recommendedVisual: '추천 스타일 비주얼',
+    navHome: 'HOME',
+    navStylist: 'STYLIST',
+    navGallery: 'REPORTS',
+    navProfile: 'PROFILE',
+  },
+  en: {
+    languageLabel: 'Language',
+    korean: '한국어',
+    english: 'English',
+    noImageSelected: 'No image selected yet.',
+    copySuccess: 'Prompt copied to your clipboard.',
+    copyFailure: 'Clipboard copy failed. Please copy it manually.',
+    encodeFailure: 'Failed to encode the image.',
+    imageDataMissing: 'Unable to read the image data.',
+    imageReadFailure: 'Something went wrong while reading the image file.',
+    responseParseFailure: 'Unable to parse the server response.',
+    imageOnlyFailure: 'Only image files can be uploaded.',
+    stylePhotoRequired: 'Please upload your photo for the style analysis.',
+    styleMetricsRequired: 'Please enter both height and weight.',
+    styleSubmitError: 'Unable to generate the style report.',
+    styleFetchError: 'Something went wrong while loading the style report.',
+    hairPhotoRequired: 'Please upload your photo for the hairstyle analysis.',
+    hairSubmitError: 'Unable to generate the hairstyle recommendation.',
+    hairFetchError: 'Something went wrong while loading the hairstyle recommendation.',
+    topbarStyle: 'Body Style Report',
+    topbarHair: 'Personal Stylist',
+    homeTitleLead: 'Choose the style recommendation',
+    homeTitleAccent: 'you want first.',
+    homeDescription:
+      'Our AI software generates digital styling outputs through separate body styling and hairstyling flows.',
+    complianceTitle: 'Digital-only AI styling software',
+    complianceBody:
+      'This product generates automated digital outputs only. It does not provide human consultation, offline services, or physical goods.',
+    homeStyleTitle: 'Body Style Report',
+    homeStyleDescription:
+      'Generate an automated digital report on silhouettes, outfit direction, and shopping ideas based on your proportions and impression.',
+    homeStyleCta: 'Start Analysis',
+    homeHairTitle: 'Hairstyling Recommendation',
+    homeHairDescription:
+      'Keep your face unchanged and generate 9 hairstyle ideas as a 3x3 image recommendation.',
+    homeHairCta: 'Discover Looks',
+    styleUploadTitle: 'Upload full-body photo',
+    styleUploadHelper: 'Drag and drop or click to browse',
+    styleUploadSelect: 'Select Image',
+    styleHeight: 'Height (cm)',
+    styleWeight: 'Weight (kg)',
+    styleHeightPlaceholder: 'e.g. 175',
+    styleWeightPlaceholder: 'e.g. 70',
+    styleAction: 'Generate Analysis',
+    styleActionLoading: 'Generating Analysis...',
+    stylePanelTag: 'AI Style Report',
+    stylePanelTitle: 'AI Automated Style Report',
+    styleEmpty:
+      'Upload your photo and body details to see the report and outfit direction here.',
+    styleVisualTitle: 'Recommended Outfit Construction',
+    stylePromptTitle: 'AI Prompt Utility',
+    stylePromptDescription:
+      'Copy a prompt for ChatGPT, Gemini, Stitch, or another generative AI tool to create more style visuals.',
+    hairUploadTitle: 'Upload Your Photo',
+    hairUploadHelper:
+      'Drag and drop or tap to upload a clear portrait for AI hair analysis.',
+    hairAction: 'Analyze My Look',
+    hairActionLoading: 'Analyzing My Look...',
+    hairPanelTag: 'AI Hair Stylist',
+    hairPanelTitle: '3x3 Hairstyle Recommendations',
+    hairEmpty:
+      'Upload your photo to see the 3x3 hairstyle grid and recommendation details here.',
+    hairPromptTitle: 'Generative Prompt',
+    hairPromptDescription:
+      'Copy an optimized prompt to try the hairstyle generation again in ChatGPT, Gemini, or another image tool.',
+    utilityButton: 'Copy prompt for image generation in my AI',
+    recommendedVisual: 'Recommended Style Visual',
+    navHome: 'HOME',
+    navStylist: 'STYLIST',
+    navGallery: 'REPORTS',
+    navProfile: 'PROFILE',
+  },
+} as const
 
 const backgroundStyle = (imageUrl: string): CSSProperties => ({
   backgroundImage: `linear-gradient(180deg, transparent 0%, rgba(17, 6, 11, 0.22) 100%), url("${imageUrl}")`,
@@ -262,20 +426,21 @@ const PersonIcon = ({ className = '' }: { className?: string }) => (
 )
 
 const navItems = [
-  { key: 'home', label: 'HOME', icon: HomeIcon },
-  { key: 'stylist', label: 'STYLIST', icon: WandIcon },
-  { key: 'gallery', label: 'GALLERY', icon: GridIcon },
-  { key: 'profile', label: 'PROFILE', icon: PersonIcon },
+  { key: 'home', icon: HomeIcon },
+  { key: 'stylist', icon: WandIcon },
+  { key: 'gallery', icon: GridIcon },
+  { key: 'profile', icon: PersonIcon },
 ] as const
 
 function App() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
+  const [language, setLanguage] = useState<Language>(getInitialLanguage)
   const [view, setView] = useState<View>(getInitialView)
 
   const [height, setHeight] = useState('')
   const [weight, setWeight] = useState('')
   const [stylePhotoFile, setStylePhotoFile] = useState<File | null>(null)
-  const [stylePhotoName, setStylePhotoName] = useState('No image selected yet.')
+  const [stylePhotoName, setStylePhotoName] = useState<string>(localeCopy.en.noImageSelected)
   const [stylePhotoPreview, setStylePhotoPreview] = useState('')
   const [styleReport, setStyleReport] = useState('')
   const [styleResultImage, setStyleResultImage] = useState('')
@@ -287,7 +452,7 @@ function App() {
   const [isStyleDragging, setIsStyleDragging] = useState(false)
 
   const [hairPhotoFile, setHairPhotoFile] = useState<File | null>(null)
-  const [hairPhotoName, setHairPhotoName] = useState('No image selected yet.')
+  const [hairPhotoName, setHairPhotoName] = useState<string>(localeCopy.en.noImageSelected)
   const [hairPhotoPreview, setHairPhotoPreview] = useState('')
   const [hairDescription, setHairDescription] = useState('')
   const [hairResultImage, setHairResultImage] = useState('')
@@ -297,11 +462,17 @@ function App() {
   const [hairErrorMessage, setHairErrorMessage] = useState('')
   const [isHairLoading, setIsHairLoading] = useState(false)
   const [isHairDragging, setIsHairDragging] = useState(false)
+  const copy = localeCopy[language]
+  const preferredLocale = language === 'ko' ? 'ko-KR' : 'en-US'
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     window.localStorage.setItem('theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    window.localStorage.setItem('language', language)
+  }, [language])
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -337,6 +508,16 @@ function App() {
     }
   }, [hairPhotoPreview])
 
+  useEffect(() => {
+    if (!stylePhotoFile) {
+      setStylePhotoName(copy.noImageSelected)
+    }
+
+    if (!hairPhotoFile) {
+      setHairPhotoName(copy.noImageSelected)
+    }
+  }, [copy.noImageSelected, hairPhotoFile, stylePhotoFile])
+
   const readFileAsBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
@@ -345,14 +526,14 @@ function App() {
         const result = reader.result
 
         if (typeof result !== 'string') {
-          reject(new Error('이미지 인코딩에 실패했습니다.'))
+          reject(new Error(copy.encodeFailure))
           return
         }
 
         const base64 = result.split(',')[1]
 
         if (!base64) {
-          reject(new Error('이미지 데이터를 읽을 수 없습니다.'))
+          reject(new Error(copy.imageDataMissing))
           return
         }
 
@@ -360,7 +541,7 @@ function App() {
       }
 
       reader.onerror = () => {
-        reject(new Error('이미지 파일을 읽는 중 오류가 발생했습니다.'))
+        reject(new Error(copy.imageReadFailure))
       }
 
       reader.readAsDataURL(file)
@@ -376,7 +557,7 @@ function App() {
     try {
       return JSON.parse(rawText) as T
     } catch {
-      throw new Error('서버 응답을 해석하지 못했습니다.')
+      throw new Error(copy.responseParseFailure)
     }
   }
 
@@ -387,7 +568,7 @@ function App() {
   const updateStylePhoto = (file: File | null) => {
     if (!file) {
       setStylePhotoFile(null)
-      setStylePhotoName('No image selected yet.')
+      setStylePhotoName(copy.noImageSelected)
 
       if (stylePhotoPreview) {
         URL.revokeObjectURL(stylePhotoPreview)
@@ -398,7 +579,7 @@ function App() {
     }
 
     if (!file.type.startsWith('image/')) {
-      setStyleErrorMessage('이미지 파일만 업로드할 수 있습니다.')
+      setStyleErrorMessage(copy.imageOnlyFailure)
       return
     }
 
@@ -415,7 +596,7 @@ function App() {
   const updateHairPhoto = (file: File | null) => {
     if (!file) {
       setHairPhotoFile(null)
-      setHairPhotoName('No image selected yet.')
+      setHairPhotoName(copy.noImageSelected)
 
       if (hairPhotoPreview) {
         URL.revokeObjectURL(hairPhotoPreview)
@@ -426,7 +607,7 @@ function App() {
     }
 
     if (!file.type.startsWith('image/')) {
-      setHairErrorMessage('이미지 파일만 업로드할 수 있습니다.')
+      setHairErrorMessage(copy.imageOnlyFailure)
       return
     }
 
@@ -444,12 +625,12 @@ function App() {
     event.preventDefault()
 
     if (!stylePhotoFile) {
-      setStyleErrorMessage('스타일 분석을 위해 본인 사진을 업로드해 주세요.')
+      setStyleErrorMessage(copy.stylePhotoRequired)
       return
     }
 
     if (!height.trim() || !weight.trim()) {
-      setStyleErrorMessage('키와 몸무게를 모두 입력해 주세요.')
+      setStyleErrorMessage(copy.styleMetricsRequired)
       return
     }
 
@@ -474,14 +655,14 @@ function App() {
           weight,
           imageBase64,
           mimeType: stylePhotoFile.type || 'image/jpeg',
-          preferredLocale: navigator.language || 'en-US',
+          preferredLocale,
         }),
       })
 
       const data = await parseResponseJson<StyleReportResponse>(response)
 
       if (!response.ok || !data?.report) {
-        throw new Error(data?.error ?? '스타일 보고서를 생성하지 못했습니다.')
+        throw new Error(data?.error ?? copy.styleSubmitError)
       }
 
       setStyleReport(data.report)
@@ -492,7 +673,7 @@ function App() {
         setStyleResultImage(`data:${data.mimeType};base64,${data.imageBase64}`)
       }
     } catch (error) {
-      const fallback = '스타일 보고서를 가져오는 중 문제가 발생했습니다.'
+      const fallback = copy.styleFetchError
       setStyleErrorMessage(error instanceof Error ? error.message : fallback)
     } finally {
       setIsStyleLoading(false)
@@ -503,7 +684,7 @@ function App() {
     event.preventDefault()
 
     if (!hairPhotoFile) {
-      setHairErrorMessage('헤어스타일 추천을 위해 본인 사진을 업로드해 주세요.')
+      setHairErrorMessage(copy.hairPhotoRequired)
       return
     }
 
@@ -526,14 +707,14 @@ function App() {
         body: JSON.stringify({
           imageBase64,
           mimeType: hairPhotoFile.type || 'image/jpeg',
-          preferredLocale: navigator.language || 'en-US',
+          preferredLocale,
         }),
       })
 
       const data = await parseResponseJson<HairRecommendationResponse>(response)
 
       if (!response.ok || !data?.description) {
-        throw new Error(data?.error ?? '헤어스타일 추천 이미지를 생성하지 못했습니다.')
+        throw new Error(data?.error ?? copy.hairSubmitError)
       }
 
       setHairDescription(data.description)
@@ -544,7 +725,7 @@ function App() {
         setHairResultImage(`data:${data.mimeType};base64,${data.imageBase64}`)
       }
     } catch (error) {
-      const fallback = '헤어스타일 추천 이미지를 가져오는 중 문제가 발생했습니다.'
+      const fallback = copy.hairFetchError
       setHairErrorMessage(error instanceof Error ? error.message : fallback)
     } finally {
       setIsHairLoading(false)
@@ -609,9 +790,9 @@ function App() {
 
     try {
       await navigator.clipboard.writeText(text)
-      onSuccess('프롬프트를 클립보드에 복사했습니다.')
+      onSuccess(copy.copySuccess)
     } catch {
-      onFailure('클립보드 복사에 실패했습니다. 직접 선택해서 복사해 주세요.')
+      onFailure(copy.copyFailure)
     }
   }
 
@@ -669,7 +850,7 @@ function App() {
       {preview ? (
         <div className="upload-preview-wrap">
           <img
-            alt="업로드한 미리보기"
+            alt={language === 'ko' ? '업로드한 미리보기' : 'Uploaded preview'}
             className="upload-preview"
             src={preview}
           />
@@ -720,7 +901,7 @@ function App() {
         {copyMessage ? <p className="status-message success">{copyMessage}</p> : null}
         <button className="utility-button" onClick={onCopy} type="button">
           <CopyIcon className="button-icon" />
-          <span>내 생성형 AI로 가져가서 이미지 생성할 프롬프트 복사하기</span>
+          <span>{copy.utilityButton}</span>
         </button>
       </section>
     )
@@ -764,7 +945,7 @@ function App() {
               </button>
 
               <h1 className="topbar-title">
-                {view === 'style' ? 'Body Style Report' : 'Personal Stylist'}
+                {view === 'style' ? copy.topbarStyle : copy.topbarHair}
               </h1>
 
               <button
@@ -784,16 +965,37 @@ function App() {
         </header>
 
         <main className="page-content">
+          <section className="language-strip" aria-label={copy.languageLabel}>
+            <span className="language-label">{copy.languageLabel}</span>
+            <div className="language-switch">
+              <button
+                className={`language-option ${language === 'ko' ? 'is-active' : ''}`}
+                onClick={() => setLanguage('ko')}
+                type="button"
+              >
+                {copy.korean}
+              </button>
+              <button
+                className={`language-option ${language === 'en' ? 'is-active' : ''}`}
+                onClick={() => setLanguage('en')}
+                type="button"
+              >
+                {copy.english}
+              </button>
+            </div>
+          </section>
+
           {view === 'home' ? (
             <>
               <section className="hero-section">
                 <h2 className="hero-title">
-                  Choose the style recommendation <span>you want first.</span>
+                  {copy.homeTitleLead} <span>{copy.homeTitleAccent}</span>
                 </h2>
-                <p className="hero-description">
-                  Our AI-powered recommendation paths help you discover your
-                  perfect look.
-                </p>
+                <p className="hero-description">{copy.homeDescription}</p>
+                <div className="compliance-banner">
+                  <strong>{copy.complianceTitle}</strong>
+                  <p>{copy.complianceBody}</p>
+                </div>
               </section>
 
               <section className="selection-stack">
@@ -809,15 +1011,12 @@ function App() {
                   />
                   <div className="selection-content">
                     <div className="selection-heading">
-                      <h3>Body Style Report</h3>
+                      <h3>{copy.homeStyleTitle}</h3>
                       <AnalyticsIcon className="selection-heading-icon" />
                     </div>
-                    <p>
-                      A deep dive into silhouettes and cuts that flatter your
-                      unique proportions and elevate your confidence.
-                    </p>
+                    <p>{copy.homeStyleDescription}</p>
                     <span className="primary-cta">
-                      <span>Start Analysis</span>
+                      <span>{copy.homeStyleCta}</span>
                       <ArrowLeftIcon className="cta-arrow" />
                     </span>
                   </div>
@@ -835,15 +1034,12 @@ function App() {
                   />
                   <div className="selection-content">
                     <div className="selection-heading">
-                      <h3>Hairstyling Recommendation</h3>
+                      <h3>{copy.homeHairTitle}</h3>
                       <ScissorsIcon className="selection-heading-icon" />
                     </div>
-                    <p>
-                      Discover the perfect cut and color based on your face
-                      shape, features, and personal aesthetic.
-                    </p>
+                    <p>{copy.homeHairDescription}</p>
                     <span className="secondary-cta">
-                      <span>Discover Looks</span>
+                      <span>{copy.homeHairCta}</span>
                       <SparkleIcon className="cta-spark" />
                     </span>
                   </div>
@@ -857,9 +1053,9 @@ function App() {
               <section className="panel panel-form">
                 <form className="stack-form" onSubmit={handleStyleSubmit}>
                   {renderPhotoField({
-                    label: 'Upload full-body photo',
-                    helper: 'Drag and drop or click to browse',
-                    selectLabel: 'Select Image',
+                    label: copy.styleUploadTitle,
+                    helper: copy.styleUploadHelper,
+                    selectLabel: copy.styleUploadSelect,
                     icon: <UploadIcon className="upload-icon-svg" />,
                     isDragging: isStyleDragging,
                     preview: stylePhotoPreview,
@@ -883,12 +1079,12 @@ function App() {
 
                   <div className="metrics-grid">
                     <label className="metric-field">
-                      <span>Height (cm)</span>
+                      <span>{copy.styleHeight}</span>
                       <div className="metric-input-wrap">
                         <input
                           inputMode="decimal"
                           onChange={(event) => setHeight(event.target.value)}
-                          placeholder="e.g. 175"
+                          placeholder={copy.styleHeightPlaceholder}
                           type="text"
                           value={height}
                         />
@@ -897,12 +1093,12 @@ function App() {
                     </label>
 
                     <label className="metric-field">
-                      <span>Weight (kg)</span>
+                      <span>{copy.styleWeight}</span>
                       <div className="metric-input-wrap">
                         <input
                           inputMode="decimal"
                           onChange={(event) => setWeight(event.target.value)}
-                          placeholder="e.g. 70"
+                          placeholder={copy.styleWeightPlaceholder}
                           type="text"
                           value={weight}
                         />
@@ -916,15 +1112,15 @@ function App() {
                   ) : null}
 
                   <button className="action-button" disabled={isStyleLoading} type="submit">
-                    {isStyleLoading ? 'Generating Analysis...' : 'Generate Analysis'}
+                    {isStyleLoading ? copy.styleActionLoading : copy.styleAction}
                   </button>
                 </form>
               </section>
 
               <section className="panel report-card">
                 <div className="report-card-header">
-                  <span className="panel-tag">AI Style Report</span>
-                  <h3>Style Consulting Report</h3>
+                  <span className="panel-tag">{copy.stylePanelTag}</span>
+                  <h3>{copy.stylePanelTitle}</h3>
                 </div>
 
                 {styleReport ? (
@@ -937,9 +1133,13 @@ function App() {
                     </div>
                     {styleResultImage ? (
                       <section className="report-visual-card">
-                        <p className="visual-caption">Recommended Outfit Construction</p>
+                        <p className="visual-caption">{copy.styleVisualTitle}</p>
                         <img
-                          alt="Generated outfit direction based on the style report"
+                          alt={
+                            language === 'ko'
+                              ? '스타일 보고서를 기반으로 생성한 착장 방향 이미지'
+                              : 'Generated outfit direction based on the style report'
+                          }
                           className="generated-image"
                           src={styleResultImage}
                         />
@@ -947,17 +1147,13 @@ function App() {
                     ) : null}
                   </>
                 ) : (
-                  <div className="empty-state">
-                    사진과 체형 정보를 입력하면 스타일 보고서와 착장 방향이 여기에
-                    표시됩니다.
-                  </div>
+                  <div className="empty-state">{copy.styleEmpty}</div>
                 )}
               </section>
 
               {renderPromptUtility({
-                title: 'AI Prompt Utility',
-                description:
-                  'Use this copy-ready prompt in ChatGPT, Gemini, Stitch, or another image tool to generate more style visuals.',
+                title: copy.stylePromptTitle,
+                description: copy.stylePromptDescription,
                 prompt: stylePrompt,
                 note: '',
                 copyMessage: styleCopyMessage,
@@ -971,8 +1167,8 @@ function App() {
               <section className="panel feature-panel">
                 <div className="feature-upload">
                   {renderPhotoField({
-                    label: 'Upload Your Photo',
-                    helper: 'Drag and drop or tap to upload a clear portrait for AI hair analysis.',
+                    label: copy.hairUploadTitle,
+                    helper: copy.hairUploadHelper,
                     icon: <CameraIcon className="upload-icon-svg" />,
                     isDragging: isHairDragging,
                     preview: hairPhotoPreview,
@@ -1000,15 +1196,15 @@ function App() {
                 ) : null}
 
                 <button className="action-button" disabled={isHairLoading} type="submit" form="hair-form-hidden">
-                  {isHairLoading ? 'Analyzing My Look...' : 'Analyze My Look'}
+                  {isHairLoading ? copy.hairActionLoading : copy.hairAction}
                 </button>
                 <form className="visually-hidden" id="hair-form-hidden" onSubmit={handleHairSubmit} />
               </section>
 
               <section className="panel report-card hair-report-card">
                 <div className="center-header">
-                  <span className="panel-tag">AI Hair Stylist</span>
-                  <h3>3x3 Hairstyle Recommendations</h3>
+                  <span className="panel-tag">{copy.hairPanelTag}</span>
+                  <h3>{copy.hairPanelTitle}</h3>
                 </div>
 
                 {hairResultImage || hairDescription ? (
@@ -1019,7 +1215,11 @@ function App() {
                     ) : null}
                     {hairResultImage ? (
                       <img
-                        alt="3x3 hairstyle recommendations"
+                        alt={
+                          language === 'ko'
+                            ? '3x3 헤어스타일 추천 이미지'
+                            : '3x3 hairstyle recommendations'
+                        }
                         className="generated-grid-image"
                         src={hairResultImage}
                       />
@@ -1033,17 +1233,13 @@ function App() {
                     ) : null}
                   </>
                 ) : (
-                  <div className="empty-state">
-                    사진을 업로드하면 3x3 헤어스타일 추천 이미지와 설명이 여기에
-                    표시됩니다.
-                  </div>
+                  <div className="empty-state">{copy.hairEmpty}</div>
                 )}
               </section>
 
               {renderPromptUtility({
-                title: 'Generative Prompt',
-                description:
-                  'Copy this optimized prompt to experiment with your own AI tools like ChatGPT, Gemini, or another image generator.',
+                title: copy.hairPromptTitle,
+                description: copy.hairPromptDescription,
                 prompt: hairPrompt,
                 note: '',
                 copyMessage: hairCopyMessage,
@@ -1082,7 +1278,15 @@ function App() {
                 type="button"
               >
                 <IconComponent className="nav-icon" />
-                <span>{item.label}</span>
+                <span>
+                  {item.key === 'home'
+                    ? copy.navHome
+                    : item.key === 'stylist'
+                      ? copy.navStylist
+                      : item.key === 'gallery'
+                        ? copy.navGallery
+                        : copy.navProfile}
+                </span>
               </button>
             )
           })}
