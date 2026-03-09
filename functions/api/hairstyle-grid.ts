@@ -32,7 +32,7 @@ type GeminiResponse = {
   }
 }
 
-const MODEL_NAME = 'gemini-2.5-flash-image'
+const MODEL_NAME = 'gemini-3.1-flash-image-preview'
 
 const jsonResponse = (
   body: Record<string, string>,
