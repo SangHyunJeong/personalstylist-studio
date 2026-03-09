@@ -1,3 +1,4 @@
 GEMINI_API_KEY=your_google_ai_studio_api_key
 POLAR_ACCESS_TOKEN=your_polar_organization_access_token
-POLAR_SERVER=production
+POLAR_SERVER=sandbox
+POLAR_WEBHOOK_SECRET=your_polar_webhook_secret

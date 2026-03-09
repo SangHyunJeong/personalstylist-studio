@@ -32,6 +32,13 @@ type CheckoutResponse = {
   error?: string
 }
 
+type CheckoutStatusResponse = {
+  status?: string
+  productId?: string
+  orderId?: string
+  error?: string
+}
+
 type Theme = 'light' | 'dark'
 type Language = 'ko' | 'en'
 type View = 'home' | 'style' | 'hair'
@@ -162,6 +169,12 @@ const localeCopy = {
     checkoutButton: 'Polar로 결제하기',
     checkoutLoading: '결제 페이지 준비 중...',
     checkoutError: '결제 페이지를 시작하지 못했습니다.',
+    checkoutVerifiedTitle: '결제 확인 완료',
+    checkoutVerifiedBody:
+      'Polar 샌드박스 결제가 성공으로 확인되었습니다. 현재 checkout 세션 상태는 검증된 상태입니다.',
+    checkoutPendingTitle: '결제 확인 대기 중',
+    checkoutPendingBody:
+      '결제 후 돌아왔지만 Polar에서 아직 성공 상태가 확정되지 않았습니다. 잠시 후 다시 새로고침해 보세요.',
     navHome: 'HOME',
     navStylist: 'STYLIST',
     navGallery: 'REPORTS',
@@ -240,6 +253,12 @@ const localeCopy = {
     checkoutButton: 'Pay with Polar',
     checkoutLoading: 'Preparing checkout...',
     checkoutError: 'Unable to start the checkout flow.',
+    checkoutVerifiedTitle: 'Payment verified',
+    checkoutVerifiedBody:
+      'Your Polar sandbox payment was verified successfully. The current checkout session has been confirmed.',
+    checkoutPendingTitle: 'Payment still pending',
+    checkoutPendingBody:
+      'You returned from checkout, but Polar has not marked this session as succeeded yet. Please refresh in a moment.',
     navHome: 'HOME',
     navStylist: 'STYLIST',
     navGallery: 'REPORTS',
@@ -481,6 +500,8 @@ function App() {
   const [isHairDragging, setIsHairDragging] = useState(false)
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false)
   const [checkoutErrorMessage, setCheckoutErrorMessage] = useState('')
+  const [checkoutStatus, setCheckoutStatus] = useState<'idle' | 'pending' | 'verified'>('idle')
+  const [checkoutStatusMessage, setCheckoutStatusMessage] = useState('')
   const copy = localeCopy[language]
   const preferredLocale = language === 'ko' ? 'ko-KR' : 'en-US'
 
@@ -536,6 +557,63 @@ function App() {
       setHairPhotoName(copy.noImageSelected)
     }
   }, [copy.noImageSelected, hairPhotoFile, stylePhotoFile])
+
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const checkoutFlag = url.searchParams.get('checkout')
+    const checkoutId = url.searchParams.get('checkout_id')
+
+    if (checkoutFlag !== 'success' || !checkoutId) {
+      return
+    }
+
+    let isCancelled = false
+
+    const verifyCheckout = async () => {
+      try {
+        const response = await fetch(
+          `/api/checkout-status?checkout_id=${encodeURIComponent(checkoutId)}&preferred_locale=${encodeURIComponent(preferredLocale)}`,
+        )
+        const rawText = await response.text()
+        const data = rawText.trim()
+          ? (JSON.parse(rawText) as CheckoutStatusResponse)
+          : null
+
+        if (!response.ok || !data?.status) {
+          throw new Error(data?.error ?? copy.checkoutError)
+        }
+
+        if (isCancelled) {
+          return
+        }
+
+        if (data.status === 'succeeded') {
+          setCheckoutStatus('verified')
+          setCheckoutStatusMessage(copy.checkoutVerifiedBody)
+          window.localStorage.setItem('polar_purchase_verified', 'true')
+          return
+        }
+
+        setCheckoutStatus('pending')
+        setCheckoutStatusMessage(copy.checkoutPendingBody)
+      } catch (error) {
+        if (isCancelled) {
+          return
+        }
+
+        setCheckoutStatus('pending')
+        setCheckoutStatusMessage(
+          error instanceof Error ? error.message : copy.checkoutError,
+        )
+      }
+    }
+
+    void verifyCheckout()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [copy.checkoutError, copy.checkoutPendingBody, copy.checkoutVerifiedBody, preferredLocale])
 
   const readFileAsBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -983,6 +1061,30 @@ function App() {
     </section>
   )
 
+  const renderCheckoutStatusCard = () => {
+    if (checkoutStatus === 'idle') {
+      return null
+    }
+
+    return (
+      <section className="utility-card checkout-status-card">
+        <div className="utility-copy">
+          <div className="utility-icon">
+            <SparkleIcon className="utility-icon-svg" />
+          </div>
+          <div>
+            <h4>
+              {checkoutStatus === 'verified'
+                ? copy.checkoutVerifiedTitle
+                : copy.checkoutPendingTitle}
+            </h4>
+            <p>{checkoutStatusMessage}</p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <div className="app-frame">
       <div className="app-shell">
@@ -1060,6 +1162,8 @@ function App() {
               </button>
             </div>
           </section>
+
+          {renderCheckoutStatusCard()}
 
           {view === 'home' ? (
             <>
