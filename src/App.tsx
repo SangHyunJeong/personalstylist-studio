@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type {
   ChangeEvent,
   DragEvent,
+  ReactNode,
   FormEvent,
 } from 'react'
 import './App.css'
@@ -203,6 +204,18 @@ function App() {
     setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))
   }
 
+  const renderReportLine = (line: string) => {
+    const segments = line.split(/(\*\*.*?\*\*)/g).filter(Boolean)
+
+    return segments.map((segment, index): ReactNode => {
+      if (segment.startsWith('**') && segment.endsWith('**')) {
+        return <strong key={`${segment}-${index}`}>{segment.slice(2, -2)}</strong>
+      }
+
+      return <span key={`${segment}-${index}`}>{segment}</span>
+    })
+  }
+
   return (
     <main className="app-shell">
       <section className="hero-panel">
@@ -313,7 +326,7 @@ function App() {
         {report ? (
           <article className="report-body">
             {report.split('\n').map((line, index) => (
-              <p key={`${line}-${index}`}>{line}</p>
+              <p key={`${line}-${index}`}>{renderReportLine(line)}</p>
             ))}
           </article>
         ) : (
