@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type {
+  CSSProperties,
   ChangeEvent,
   DragEvent,
   FormEvent,
@@ -29,9 +30,15 @@ type HairRecommendationResponse = {
 type Theme = 'light' | 'dark'
 type View = 'home' | 'style' | 'hair'
 
+const homeStyleImage =
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuDQjx-vParhC1dothBqJzuH356lz73-3ubERqUoT5vD7PVP-6JWbDUJOmUiF7xHQu1a3AvUMNrHW-RYaRmRSLlWsZejfRc9IkyHIB5x0r7TScYE-OT3lXUhRyl5r37cDOMlynoU9NXuA65unD52y31OY7Q-ni6AFAwrRSWbYU98PSLxaWZvysgx72USxcVwLNYX3C9CaPR5qmcmow2iAt1Eupi0iZPhBPUyf8z_xepgOug3zcHgSv_QMSD1qZRtUY9T5DSq1mVQrS0P'
+
+const homeHairImage =
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuCiSoCbdZuRJXGn4Kar-8Sh8WklP3L-cazvB65L2O-j9SDHoSd2DGfiznQyEpdI_JEZEkTKsoK9tkDC_HwU03HvOSayIiYsiUnoZLr9bbYrj-SDFS-3Yi5Ta8VVZCQB0B2ZgNvncqijcLi6l2T22UzdyOUKEdlD4ZACHKAIRA2AVFUpLVuPWL1RrR0hqAK8bGBc-U6yjKz5NihvIWvV4WuqWfYspWoWrYPUkhuUzxf_UMnLMJA2-NFcnaxo7EKcfJOnOjTNIvVIMg5I'
+
 const getInitialTheme = (): Theme => {
   if (typeof window === 'undefined') {
-    return 'light'
+    return 'dark'
   }
 
   const storedTheme = window.localStorage.getItem('theme')
@@ -59,6 +66,208 @@ const getInitialView = (): View => {
   return 'home'
 }
 
+const backgroundStyle = (imageUrl: string): CSSProperties => ({
+  backgroundImage: `linear-gradient(180deg, transparent 0%, rgba(17, 6, 11, 0.22) 100%), url("${imageUrl}")`,
+})
+
+const Icon = ({
+  children,
+  className = '',
+}: {
+  children: ReactNode
+  className?: string
+}) => (
+  <svg
+    aria-hidden="true"
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+  >
+    {children}
+  </svg>
+)
+
+const SparkleIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <path
+      d="M12 3.75 13.85 8.15 18.25 10 13.85 11.85 12 16.25 10.15 11.85 5.75 10 10.15 8.15 12 3.75Z"
+      fill="currentColor"
+    />
+    <path
+      d="M18.75 3.75 19.45 5.55 21.25 6.25 19.45 6.95 18.75 8.75 18.05 6.95 16.25 6.25 18.05 5.55 18.75 3.75Z"
+      fill="currentColor"
+    />
+  </Icon>
+)
+
+const SunIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <circle cx="12" cy="12" fill="currentColor" r="4.25" />
+    <path
+      d="M12 2.75v2.5M12 18.75v2.5M21.25 12h-2.5M5.25 12h-2.5M18.54 5.46l-1.77 1.77M7.23 16.77l-1.77 1.77M18.54 18.54l-1.77-1.77M7.23 7.23 5.46 5.46"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeWidth="1.6"
+    />
+  </Icon>
+)
+
+const MoonIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <path
+      d="M14.5 3.4a8.6 8.6 0 1 0 6.1 14.7A7.55 7.55 0 0 1 14.5 3.4Z"
+      fill="currentColor"
+    />
+  </Icon>
+)
+
+const ArrowLeftIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <path
+      d="M14.75 5.5 8.25 12l6.5 6.5"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+    />
+  </Icon>
+)
+
+const AnalyticsIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <rect fill="currentColor" height="12" opacity=".38" rx="1.5" width="3.5" x="4" y="8" />
+    <rect fill="currentColor" height="8" opacity=".65" rx="1.5" width="3.5" x="10.25" y="12" />
+    <rect fill="currentColor" height="15" rx="1.5" width="3.5" x="16.5" y="5" />
+  </Icon>
+)
+
+const ScissorsIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <circle cx="6.5" cy="16.75" r="2.25" stroke="currentColor" strokeWidth="1.7" />
+    <circle cx="6.5" cy="7.25" r="2.25" stroke="currentColor" strokeWidth="1.7" />
+    <path
+      d="M19.5 5.5 8.6 11.3M19.5 18.5 8.6 12.7M11.4 12l8.1 0"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    />
+  </Icon>
+)
+
+const UploadIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <path
+      d="M12 15.75V6.75M8.5 10.25 12 6.75l3.5 3.5"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+    />
+    <path
+      d="M5.5 18.25h13"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeWidth="1.8"
+    />
+  </Icon>
+)
+
+const CameraIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <path
+      d="M7.5 7.5h2l1.1-1.75h2.8L14.5 7.5h2A2.5 2.5 0 0 1 19 10v6A2.5 2.5 0 0 1 16.5 18.5h-9A2.5 2.5 0 0 1 5 16v-6A2.5 2.5 0 0 1 7.5 7.5Z"
+      stroke="currentColor"
+      strokeLinejoin="round"
+      strokeWidth="1.6"
+    />
+    <circle cx="12" cy="13" r="2.6" stroke="currentColor" strokeWidth="1.6" />
+  </Icon>
+)
+
+const CopyIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <rect
+      height="10"
+      rx="2"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      width="9"
+      x="8.5"
+      y="8"
+    />
+    <path
+      d="M6.25 15.5h-.75A2.5 2.5 0 0 1 3 13V5.5A2.5 2.5 0 0 1 5.5 3H13a2.5 2.5 0 0 1 2.5 2.5v.75"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.6"
+    />
+  </Icon>
+)
+
+const CheckIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <circle cx="12" cy="12" fill="currentColor" opacity=".14" r="9" />
+    <path
+      d="m8.5 12.25 2.3 2.3 4.7-5.1"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+    />
+  </Icon>
+)
+
+const HomeIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <path
+      d="M5.5 10.25 12 5l6.5 5.25v7.25h-4.75V13h-3.5v4.5H5.5v-7.25Z"
+      fill="currentColor"
+    />
+  </Icon>
+)
+
+const WandIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <path
+      d="m5.5 17.75 6.65-6.65M14.85 8.4l3.65-3.65M15.95 4.75l.7 1.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7.7-1.7ZM7.5 9l.95 2.2 2.2.95-2.2.95-.95 2.2-.95-2.2-2.2-.95 2.2-.95L7.5 9Z"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.6"
+    />
+  </Icon>
+)
+
+const GridIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <rect fill="currentColor" height="5.25" rx="1.1" width="5.25" x="4" y="4" />
+    <rect fill="currentColor" height="5.25" rx="1.1" width="5.25" x="14.75" y="4" />
+    <rect fill="currentColor" height="5.25" rx="1.1" width="5.25" x="4" y="14.75" />
+    <rect fill="currentColor" height="5.25" rx="1.1" width="5.25" x="14.75" y="14.75" />
+  </Icon>
+)
+
+const PersonIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <circle cx="12" cy="8.25" fill="currentColor" r="3.25" />
+    <path
+      d="M5.75 18.5a6.25 6.25 0 0 1 12.5 0"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeWidth="1.8"
+    />
+  </Icon>
+)
+
+const navItems = [
+  { key: 'home', label: 'HOME', icon: HomeIcon },
+  { key: 'stylist', label: 'STYLIST', icon: WandIcon },
+  { key: 'gallery', label: 'GALLERY', icon: GridIcon },
+  { key: 'profile', label: 'PROFILE', icon: PersonIcon },
+] as const
+
 function App() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const [view, setView] = useState<View>(getInitialView)
@@ -66,7 +275,7 @@ function App() {
   const [height, setHeight] = useState('')
   const [weight, setWeight] = useState('')
   const [stylePhotoFile, setStylePhotoFile] = useState<File | null>(null)
-  const [stylePhotoName, setStylePhotoName] = useState('아직 선택된 사진이 없습니다')
+  const [stylePhotoName, setStylePhotoName] = useState('No image selected yet.')
   const [stylePhotoPreview, setStylePhotoPreview] = useState('')
   const [styleReport, setStyleReport] = useState('')
   const [styleResultImage, setStyleResultImage] = useState('')
@@ -78,7 +287,7 @@ function App() {
   const [isStyleDragging, setIsStyleDragging] = useState(false)
 
   const [hairPhotoFile, setHairPhotoFile] = useState<File | null>(null)
-  const [hairPhotoName, setHairPhotoName] = useState('아직 선택된 사진이 없습니다')
+  const [hairPhotoName, setHairPhotoName] = useState('No image selected yet.')
   const [hairPhotoPreview, setHairPhotoPreview] = useState('')
   const [hairDescription, setHairDescription] = useState('')
   const [hairResultImage, setHairResultImage] = useState('')
@@ -128,10 +337,6 @@ function App() {
     }
   }, [hairPhotoPreview])
 
-  const toggleTheme = () => {
-    setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))
-  }
-
   const readFileAsBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
@@ -175,10 +380,14 @@ function App() {
     }
   }
 
+  const toggleTheme = () => {
+    setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))
+  }
+
   const updateStylePhoto = (file: File | null) => {
     if (!file) {
       setStylePhotoFile(null)
-      setStylePhotoName('아직 선택된 사진이 없습니다')
+      setStylePhotoName('No image selected yet.')
 
       if (stylePhotoPreview) {
         URL.revokeObjectURL(stylePhotoPreview)
@@ -206,7 +415,7 @@ function App() {
   const updateHairPhoto = (file: File | null) => {
     if (!file) {
       setHairPhotoFile(null)
-      setHairPhotoName('아직 선택된 사진이 없습니다')
+      setHairPhotoName('No image selected yet.')
 
       if (hairPhotoPreview) {
         URL.revokeObjectURL(hairPhotoPreview)
@@ -342,7 +551,7 @@ function App() {
     }
   }
 
-  const renderRichTextLine = (line: string) => {
+  const renderInlineRichText = (line: string) => {
     const segments = line.split(/(\*\*.*?\*\*)/g).filter(Boolean)
 
     return segments.map((segment, index): ReactNode => {
@@ -352,6 +561,41 @@ function App() {
 
       return <span key={`${segment}-${index}`}>{segment}</span>
     })
+  }
+
+  const renderFormattedBlock = (line: string, index: number) => {
+    const trimmed = line.trim()
+
+    if (!trimmed) {
+      return <div className="rich-spacer" key={`space-${index}`} />
+    }
+
+    if (trimmed === '---') {
+      return <div className="rich-divider" key={`divider-${index}`} />
+    }
+
+    if (trimmed.startsWith('### ')) {
+      return (
+        <h4 className="rich-heading" key={`heading-${index}`}>
+          {renderInlineRichText(trimmed.slice(4))}
+        </h4>
+      )
+    }
+
+    if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+      return (
+        <div className="rich-list-item" key={`list-${index}`}>
+          <CheckIcon className="rich-list-icon" />
+          <p>{renderInlineRichText(trimmed.slice(2))}</p>
+        </div>
+      )
+    }
+
+    return (
+      <p className="rich-paragraph" key={`paragraph-${index}`}>
+        {renderInlineRichText(trimmed)}
+      </p>
+    )
   }
 
   const copyText = async (
@@ -379,8 +623,17 @@ function App() {
     await copyText(hairPrompt, setHairCopyMessage, setHairCopyMessage)
   }
 
+  const activeNav = view === 'style'
+    ? 'gallery'
+    : view === 'hair'
+      ? 'stylist'
+      : 'home'
+
   const renderPhotoField = ({
     label,
+    helper,
+    selectLabel,
+    icon,
     isDragging,
     preview,
     name,
@@ -390,6 +643,9 @@ function App() {
     onDrop,
   }: {
     label: string
+    helper: string
+    selectLabel?: string
+    icon: ReactNode
     isDragging: boolean
     preview: string
     name: string
@@ -399,320 +655,440 @@ function App() {
     onDrop: (event: DragEvent<HTMLLabelElement>) => void
   }) => (
     <label
-      className={`photo-field ${isDragging ? 'is-dragging' : ''}`}
+      className={`upload-card ${isDragging ? 'is-dragging' : ''}`}
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
-      <span className="field-label">{label}</span>
       <input
         accept="image/*"
         className="photo-input"
         onChange={onChange}
         type="file"
       />
-
-      <div className="photo-dropzone">
-        {preview ? (
+      {preview ? (
+        <div className="upload-preview-wrap">
           <img
-            alt="업로드한 프로필 미리보기"
-            className="photo-preview"
+            alt="업로드한 미리보기"
+            className="upload-preview"
             src={preview}
           />
-        ) : (
-          <div className="photo-placeholder">
-            <strong>사진을 끌어다 놓거나 클릭해서 업로드하세요</strong>
-            <p>정면 전신 또는 상반신 사진이면 더 정확한 추천이 가능합니다.</p>
-          </div>
-        )}
-      </div>
-
-      <span className="photo-name">{name}</span>
+          <span className="upload-file-name">{name}</span>
+        </div>
+      ) : (
+        <div className="upload-empty">
+          <div className="upload-icon-badge">{icon}</div>
+          <strong>{label}</strong>
+          <p>{helper}</p>
+          {selectLabel ? <span className="upload-select-button">{selectLabel}</span> : null}
+        </div>
+      )}
     </label>
   )
 
+  const renderPromptUtility = ({
+    title,
+    description,
+    prompt,
+    note,
+    copyMessage,
+    onCopy,
+  }: {
+    title: string
+    description: string
+    prompt: string
+    note: string
+    copyMessage: string
+    onCopy: () => Promise<void>
+  }) => {
+    if (!prompt) {
+      return null
+    }
+
+    return (
+      <section className="utility-card">
+        <div className="utility-copy">
+          <div className="utility-icon">
+            <SparkleIcon className="utility-icon-svg" />
+          </div>
+          <div>
+            <h4>{title}</h4>
+            <p>{description}</p>
+          </div>
+        </div>
+        {note ? <p className="status-message fallback">{note}</p> : null}
+        {copyMessage ? <p className="status-message success">{copyMessage}</p> : null}
+        <button className="utility-button" onClick={onCopy} type="button">
+          <CopyIcon className="button-icon" />
+          <span>내 생성형 AI로 가져가서 이미지 생성할 프롬프트 복사하기</span>
+        </button>
+      </section>
+    )
+  }
+
   return (
-    <main className="app-shell">
-      <section className="hero-panel">
-        <div className="hero-topbar">
-          <div className="hero-actions">
-            {view !== 'home' ? (
+    <div className="app-frame">
+      <div className="app-shell">
+        <header className="topbar">
+          {view === 'home' ? (
+            <>
+              <div className="brand">
+                <div className="brand-badge">
+                  <SparkleIcon className="brand-badge-icon" />
+                </div>
+                <span className="brand-name">STYLIS.</span>
+              </div>
+
               <button
-                className="back-button"
+                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                className="icon-button theme-button"
+                onClick={toggleTheme}
+                type="button"
+              >
+                {theme === 'dark' ? (
+                  <SunIcon className="topbar-icon" />
+                ) : (
+                  <MoonIcon className="topbar-icon" />
+                )}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                aria-label="Go back"
+                className="icon-button"
                 onClick={() => setView('home')}
                 type="button"
               >
-                홈으로
+                <ArrowLeftIcon className="topbar-icon" />
               </button>
-            ) : null}
-            <p className="eyebrow">PERSONAL STYLIST</p>
-          </div>
 
-          <button className="theme-toggle" onClick={toggleTheme} type="button">
-            {theme === 'dark' ? '라이트 모드' : '다크 모드'}
-          </button>
-        </div>
-
-        {view === 'home' ? (
-          <>
-            <h1>어떤 스타일 추천을 받을지 먼저 선택하세요.</h1>
-            <p className="hero-copy">
-              체형 기반 코디 추천과 헤어스타일링 추천을 분리해서, 같은 사진으로도
-              다른 방향의 스타일 컨설팅을 받을 수 있게 구성했습니다.
-            </p>
-
-            <div className="mode-grid">
-              <button
-                className="mode-card"
-                onClick={() => setView('style')}
-                type="button"
-              >
-                <span>1</span>
-                <strong>체형에 맞는 스타일 제안</strong>
-                <p>사진, 키, 몸무게를 바탕으로 코디와 핏 중심의 보고서를 생성합니다.</p>
-              </button>
+              <h1 className="topbar-title">
+                {view === 'style' ? 'Body Style Report' : 'Personal Stylist'}
+              </h1>
 
               <button
-                className="mode-card"
-                onClick={() => setView('hair')}
+                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                className="icon-button theme-button"
+                onClick={toggleTheme}
                 type="button"
               >
-                <span>2</span>
-                <strong>헤어스타일링 추천</strong>
-                <p>사진 속 얼굴은 유지한 채, 잘 어울리는 헤어스타일 9가지를 3x3 그리드로 생성합니다.</p>
+                {theme === 'dark' ? (
+                  <SunIcon className="topbar-icon" />
+                ) : (
+                  <MoonIcon className="topbar-icon" />
+                )}
               </button>
-            </div>
-          </>
-        ) : view === 'style' ? (
-          <>
-            <h1>체형에 맞는 스타일 보고서를 생성해보세요.</h1>
-            <p className="hero-copy">
-              체형 정보와 얼굴 인상을 함께 참고해, 옷의 핏과 실루엣, 코디 방향을
-              텍스트 보고서로 정리하고, 가능하면 착장 이미지를 함께 생성합니다.
-            </p>
-          </>
-        ) : (
-          <>
-            <h1>얼굴은 그대로, 헤어스타일만 바꿔서 추천받아보세요.</h1>
-            <p className="hero-copy">
-              AI 헤어스타일리스트가 첨부한 사진 속 인물의 얼굴을 유지한 채, 가장
-              잘 어울리는 헤어스타일 9개를 3x3 그리드 이미지로 생성합니다.
-            </p>
-          </>
-        )}
-      </section>
+            </>
+          )}
+        </header>
 
-      {view === 'style' ? (
-        <>
-          <section className="content-panel">
-            <div className="form-header">
-              <p>Style Report</p>
-              <h2>기본 정보 입력</h2>
-            </div>
+        <main className="page-content">
+          {view === 'home' ? (
+            <>
+              <section className="hero-section">
+                <h2 className="hero-title">
+                  Choose the style recommendation <span>you want first.</span>
+                </h2>
+                <p className="hero-description">
+                  Our AI-powered recommendation paths help you discover your
+                  perfect look.
+                </p>
+              </section>
 
-            <form className="profile-form" onSubmit={handleStyleSubmit}>
-              {renderPhotoField({
-                label: '본인 사진',
-                isDragging: isStyleDragging,
-                preview: stylePhotoPreview,
-                name: stylePhotoName,
-                onChange: (event) => updateStylePhoto(event.target.files?.[0] ?? null),
-                onDragOver: (event) => {
-                  event.preventDefault()
-                  setIsStyleDragging(true)
-                },
-                onDragLeave: (event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                    setIsStyleDragging(false)
-                  }
-                },
-                onDrop: (event) => {
-                  event.preventDefault()
-                  setIsStyleDragging(false)
-                  updateStylePhoto(event.dataTransfer.files?.[0] ?? null)
-                },
-              })}
-
-              <div className="metrics-grid">
-                <label className="input-field">
-                  <span className="field-label">키</span>
-                  <div className="input-wrap">
-                    <input
-                      inputMode="decimal"
-                      onChange={(event) => setHeight(event.target.value)}
-                      placeholder="예: 170"
-                      type="text"
-                      value={height}
-                    />
-                    <span>cm</span>
-                  </div>
-                </label>
-
-                <label className="input-field">
-                  <span className="field-label">몸무게</span>
-                  <div className="input-wrap">
-                    <input
-                      inputMode="decimal"
-                      onChange={(event) => setWeight(event.target.value)}
-                      placeholder="예: 70"
-                      type="text"
-                      value={weight}
-                    />
-                    <span>kg</span>
-                  </div>
-                </label>
-              </div>
-
-              {styleErrorMessage ? (
-                <p className="status-message error">{styleErrorMessage}</p>
-              ) : null}
-
-              <button className="submit-button" disabled={isStyleLoading} type="submit">
-                {isStyleLoading ? '스타일 보고서 생성 중...' : '체형 스타일 추천받기'}
-              </button>
-            </form>
-          </section>
-
-          <section className="report-panel">
-            <div className="report-header">
-              <p>AI Style Report</p>
-              <h3>스타일 컨설팅 보고서</h3>
-            </div>
-
-            {styleReport ? (
-              <div className="generated-result">
-                {styleNote ? <p className="status-message fallback">{styleNote}</p> : null}
-                {styleCopyMessage ? (
-                  <p className="status-message fallback">{styleCopyMessage}</p>
-                ) : null}
-                {styleResultImage ? (
-                  <img
-                    alt="스타일 보고서를 바탕으로 생성한 착장 이미지"
-                    className="generated-result-image"
-                    src={styleResultImage}
+              <section className="selection-stack">
+                <button
+                  className="selection-card"
+                  onClick={() => setView('style')}
+                  type="button"
+                >
+                  <div
+                    aria-hidden="true"
+                    className="selection-visual"
+                    style={backgroundStyle(homeStyleImage)}
                   />
-                ) : null}
-                {stylePrompt ? (
-                  <div className="prompt-panel">
-                    <strong>외부 생성형 AI에서 룩 이미지 다시 생성해보기</strong>
-                    <p className="prompt-description">
-                      내 생성형 AI로 가져가서 이미지 생성할 프롬프트를 복사합니다.
+                  <div className="selection-content">
+                    <div className="selection-heading">
+                      <h3>Body Style Report</h3>
+                      <AnalyticsIcon className="selection-heading-icon" />
+                    </div>
+                    <p>
+                      A deep dive into silhouettes and cuts that flatter your
+                      unique proportions and elevate your confidence.
                     </p>
-                    <button className="copy-button" onClick={copyStylePrompt} type="button">
-                      내 생성형 AI로 가져가서 이미지 생성할 프롬프트 복사하기
-                    </button>
+                    <span className="primary-cta">
+                      <span>Start Analysis</span>
+                      <ArrowLeftIcon className="cta-arrow" />
+                    </span>
                   </div>
-                ) : null}
-                <article className="report-body">
-                  {styleReport.split('\n').map((line, index) => (
-                    <p key={`${line}-${index}`}>{renderRichTextLine(line)}</p>
-                  ))}
-                </article>
-              </div>
-            ) : (
-              <div className="report-placeholder">
-                사진과 체형 정보를 입력한 뒤 보고서를 생성하면, 실루엣 분석과 추천
-                룩 방향이 여기에 표시되고, 가능하면 착장 이미지와 복사 프롬프트도
-                함께 제공됩니다.
-              </div>
-            )}
-          </section>
-        </>
-      ) : null}
+                </button>
 
-      {view === 'hair' ? (
-        <>
-          <section className="content-panel">
-            <div className="form-header">
-              <p>Hair Styling</p>
-              <h2>헤어스타일링 추천</h2>
-            </div>
-
-            <p className="section-copy">
-              업로드한 사진 속 얼굴은 유지한 채, 가장 잘 어울리는 헤어스타일 9개를
-              3x3 그리드 이미지와 설명으로 생성합니다.
-            </p>
-
-            <form className="profile-form" onSubmit={handleHairSubmit}>
-              {renderPhotoField({
-                label: '헤어스타일링용 사진',
-                isDragging: isHairDragging,
-                preview: hairPhotoPreview,
-                name: hairPhotoName,
-                onChange: (event) => updateHairPhoto(event.target.files?.[0] ?? null),
-                onDragOver: (event) => {
-                  event.preventDefault()
-                  setIsHairDragging(true)
-                },
-                onDragLeave: (event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                    setIsHairDragging(false)
-                  }
-                },
-                onDrop: (event) => {
-                  event.preventDefault()
-                  setIsHairDragging(false)
-                  updateHairPhoto(event.dataTransfer.files?.[0] ?? null)
-                },
-              })}
-
-              {hairErrorMessage ? (
-                <p className="status-message error">{hairErrorMessage}</p>
-              ) : null}
-
-              <button className="submit-button" disabled={isHairLoading} type="submit">
-                {isHairLoading ? '헤어스타일 추천 생성 중...' : '헤어스타일 추천받기'}
-              </button>
-            </form>
-          </section>
-
-          <section className="report-panel">
-            <div className="report-header">
-              <p>AI Hair Stylist</p>
-              <h3>3x3 헤어스타일 추천</h3>
-            </div>
-
-            {hairResultImage || hairPrompt ? (
-              <div className="generated-result">
-                {hairNote ? <p className="status-message fallback">{hairNote}</p> : null}
-                {hairCopyMessage ? (
-                  <p className="status-message fallback">{hairCopyMessage}</p>
-                ) : null}
-                {hairResultImage ? (
-                  <img
-                    alt="추천된 3x3 헤어스타일 그리드"
-                    className="generated-result-image"
-                    src={hairResultImage}
+                <button
+                  className="selection-card"
+                  onClick={() => setView('hair')}
+                  type="button"
+                >
+                  <div
+                    aria-hidden="true"
+                    className="selection-visual"
+                    style={backgroundStyle(homeHairImage)}
                   />
-                ) : null}
-                {hairPrompt ? (
-                  <div className="prompt-panel">
-                    <strong>외부 생성형 AI에서 헤어 이미지 다시 생성해보기</strong>
-                    <p className="prompt-description">
-                      내 생성형 AI로 가져가서 이미지 생성할 프롬프트를 복사합니다.
+                  <div className="selection-content">
+                    <div className="selection-heading">
+                      <h3>Hairstyling Recommendation</h3>
+                      <ScissorsIcon className="selection-heading-icon" />
+                    </div>
+                    <p>
+                      Discover the perfect cut and color based on your face
+                      shape, features, and personal aesthetic.
                     </p>
-                    <button className="copy-button" onClick={copyHairPrompt} type="button">
-                      내 생성형 AI로 가져가서 이미지 생성할 프롬프트 복사하기
-                    </button>
+                    <span className="secondary-cta">
+                      <span>Discover Looks</span>
+                      <SparkleIcon className="cta-spark" />
+                    </span>
                   </div>
+                </button>
+              </section>
+            </>
+          ) : null}
+
+          {view === 'style' ? (
+            <>
+              <section className="panel panel-form">
+                <form className="stack-form" onSubmit={handleStyleSubmit}>
+                  {renderPhotoField({
+                    label: 'Upload full-body photo',
+                    helper: 'Drag and drop or click to browse',
+                    selectLabel: 'Select Image',
+                    icon: <UploadIcon className="upload-icon-svg" />,
+                    isDragging: isStyleDragging,
+                    preview: stylePhotoPreview,
+                    name: stylePhotoName,
+                    onChange: (event) => updateStylePhoto(event.target.files?.[0] ?? null),
+                    onDragOver: (event) => {
+                      event.preventDefault()
+                      setIsStyleDragging(true)
+                    },
+                    onDragLeave: (event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                        setIsStyleDragging(false)
+                      }
+                    },
+                    onDrop: (event) => {
+                      event.preventDefault()
+                      setIsStyleDragging(false)
+                      updateStylePhoto(event.dataTransfer.files?.[0] ?? null)
+                    },
+                  })}
+
+                  <div className="metrics-grid">
+                    <label className="metric-field">
+                      <span>Height (cm)</span>
+                      <div className="metric-input-wrap">
+                        <input
+                          inputMode="decimal"
+                          onChange={(event) => setHeight(event.target.value)}
+                          placeholder="e.g. 175"
+                          type="text"
+                          value={height}
+                        />
+                        <em>cm</em>
+                      </div>
+                    </label>
+
+                    <label className="metric-field">
+                      <span>Weight (kg)</span>
+                      <div className="metric-input-wrap">
+                        <input
+                          inputMode="decimal"
+                          onChange={(event) => setWeight(event.target.value)}
+                          placeholder="e.g. 70"
+                          type="text"
+                          value={weight}
+                        />
+                        <em>kg</em>
+                      </div>
+                    </label>
+                  </div>
+
+                  {styleErrorMessage ? (
+                    <p className="status-message error">{styleErrorMessage}</p>
+                  ) : null}
+
+                  <button className="action-button" disabled={isStyleLoading} type="submit">
+                    {isStyleLoading ? 'Generating Analysis...' : 'Generate Analysis'}
+                  </button>
+                </form>
+              </section>
+
+              <section className="panel report-card">
+                <div className="report-card-header">
+                  <span className="panel-tag">AI Style Report</span>
+                  <h3>Style Consulting Report</h3>
+                </div>
+
+                {styleReport ? (
+                  <>
+                    {styleNote ? <p className="status-message fallback">{styleNote}</p> : null}
+                    <div className="rich-content">
+                      {styleReport.split('\n').map((line, index) => (
+                        renderFormattedBlock(line, index)
+                      ))}
+                    </div>
+                    {styleResultImage ? (
+                      <section className="report-visual-card">
+                        <p className="visual-caption">Recommended Outfit Construction</p>
+                        <img
+                          alt="Generated outfit direction based on the style report"
+                          className="generated-image"
+                          src={styleResultImage}
+                        />
+                      </section>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="empty-state">
+                    사진과 체형 정보를 입력하면 스타일 보고서와 착장 방향이 여기에
+                    표시됩니다.
+                  </div>
+                )}
+              </section>
+
+              {renderPromptUtility({
+                title: 'AI Prompt Utility',
+                description:
+                  'Use this copy-ready prompt in ChatGPT, Gemini, Stitch, or another image tool to generate more style visuals.',
+                prompt: stylePrompt,
+                note: '',
+                copyMessage: styleCopyMessage,
+                onCopy: copyStylePrompt,
+              })}
+            </>
+          ) : null}
+
+          {view === 'hair' ? (
+            <>
+              <section className="panel feature-panel">
+                <div className="feature-upload">
+                  {renderPhotoField({
+                    label: 'Upload Your Photo',
+                    helper: 'Drag and drop or tap to upload a clear portrait for AI hair analysis.',
+                    icon: <CameraIcon className="upload-icon-svg" />,
+                    isDragging: isHairDragging,
+                    preview: hairPhotoPreview,
+                    name: hairPhotoName,
+                    onChange: (event) => updateHairPhoto(event.target.files?.[0] ?? null),
+                    onDragOver: (event) => {
+                      event.preventDefault()
+                      setIsHairDragging(true)
+                    },
+                    onDragLeave: (event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                        setIsHairDragging(false)
+                      }
+                    },
+                    onDrop: (event) => {
+                      event.preventDefault()
+                      setIsHairDragging(false)
+                      updateHairPhoto(event.dataTransfer.files?.[0] ?? null)
+                    },
+                  })}
+                </div>
+
+                {hairErrorMessage ? (
+                  <p className="status-message error">{hairErrorMessage}</p>
                 ) : null}
-                <article className="report-body">
-                  {hairDescription.split('\n').map((line, index) => (
-                    <p key={`${line}-${index}`}>{renderRichTextLine(line)}</p>
-                  ))}
-                </article>
-              </div>
-            ) : (
-              <div className="report-placeholder">
-                사진을 업로드한 뒤 추천을 생성하면, 얼굴은 유지한 3x3 헤어스타일
-                이미지가 생성되거나, 외부 툴에 붙여넣을 수 있는 프롬프트가
-                여기에 표시됩니다.
-              </div>
-            )}
-          </section>
-        </>
-      ) : null}
-    </main>
+
+                <button className="action-button" disabled={isHairLoading} type="submit" form="hair-form-hidden">
+                  {isHairLoading ? 'Analyzing My Look...' : 'Analyze My Look'}
+                </button>
+                <form className="visually-hidden" id="hair-form-hidden" onSubmit={handleHairSubmit} />
+              </section>
+
+              <section className="panel report-card hair-report-card">
+                <div className="center-header">
+                  <span className="panel-tag">AI Hair Stylist</span>
+                  <h3>3x3 Hairstyle Recommendations</h3>
+                </div>
+
+                {hairResultImage || hairDescription ? (
+                  <>
+                    {hairNote ? <p className="status-message fallback">{hairNote}</p> : null}
+                    {hairCopyMessage ? (
+                      <p className="status-message success">{hairCopyMessage}</p>
+                    ) : null}
+                    {hairResultImage ? (
+                      <img
+                        alt="3x3 hairstyle recommendations"
+                        className="generated-grid-image"
+                        src={hairResultImage}
+                      />
+                    ) : null}
+                    {hairDescription ? (
+                      <div className="rich-content compact">
+                        {hairDescription.split('\n').map((line, index) => (
+                          renderFormattedBlock(line, index)
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="empty-state">
+                    사진을 업로드하면 3x3 헤어스타일 추천 이미지와 설명이 여기에
+                    표시됩니다.
+                  </div>
+                )}
+              </section>
+
+              {renderPromptUtility({
+                title: 'Generative Prompt',
+                description:
+                  'Copy this optimized prompt to experiment with your own AI tools like ChatGPT, Gemini, or another image generator.',
+                prompt: hairPrompt,
+                note: '',
+                copyMessage: hairCopyMessage,
+                onCopy: copyHairPrompt,
+              })}
+            </>
+          ) : null}
+        </main>
+
+        <nav className="bottom-nav">
+          {navItems.map((item) => {
+            const IconComponent = item.icon
+            const isActive = activeNav === item.key
+            const isClickable = item.key === 'home' || item.key === 'stylist' || item.key === 'gallery'
+
+            const handleClick = () => {
+              if (item.key === 'home') {
+                setView('home')
+              }
+
+              if (item.key === 'stylist') {
+                setView('hair')
+              }
+
+              if (item.key === 'gallery') {
+                setView('style')
+              }
+            }
+
+            return (
+              <button
+                className={`nav-item ${isActive ? 'is-active' : ''}`}
+                disabled={!isClickable}
+                key={item.key}
+                onClick={handleClick}
+                type="button"
+              >
+                <IconComponent className="nav-icon" />
+                <span>{item.label}</span>
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+    </div>
   )
 }
 
