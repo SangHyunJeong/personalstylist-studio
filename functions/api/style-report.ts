@@ -54,6 +54,9 @@ const jsonResponse = (
 const isKoreanLocale = (preferredLocale?: string) =>
   preferredLocale?.toLowerCase().startsWith('ko') ?? false
 
+const isLocationRestrictedError = (message?: string) =>
+  message?.toLowerCase().includes('user location is not supported') ?? false
+
 const getBaseApiUrl = (server?: string) =>
   server === 'sandbox'
     ? 'https://sandbox-api.polar.sh'
@@ -221,6 +224,79 @@ const buildStyleImagePrompt = ({
     report,
   ].join('\n\n')
 
+const buildOfflineStyleFallbackReport = ({
+  height,
+  weight,
+  preferredLocale,
+}: {
+  height: string
+  weight: string
+  preferredLocale?: string
+}) =>
+  isKoreanLocale(preferredLocale)
+    ? [
+        '### 한 줄 요약',
+        '현재 지역 제한 때문에 서버에서 Gemini 기반 사진 분석을 직접 완료하지 못했습니다. 대신 외부 생성형 AI에 바로 넣을 수 있는 스타일 방향과 프롬프트를 준비했습니다.',
+        '',
+        '### 기본 분석 메모',
+        `* 입력 기준: 키 ${height}cm, 몸무게 ${weight}kg`,
+        '* 업로드한 같은 사진을 외부 생성형 AI에 함께 넣고, 얼굴과 체형은 유지한 채 의상과 스타일링만 바꾸도록 요청하세요.',
+        '* 아래 가이드는 정밀 체형 판독 결과가 아니라, 사진 재활용용 스타일 브리프로 활용하는 용도입니다.',
+        '',
+        '### 추천 실루엣',
+        '* 세로 라인이 보이도록 상하 비율을 정리한 하이웨이스트 조합',
+        '* 어깨선과 허리선이 분명한 구조적 아우터 또는 재킷',
+        '* 과한 장식보다 핏, 길이, 레이어 균형이 잘 보이는 미니멀 스타일',
+        '',
+        '### 추천 착장 방향 3가지',
+        '* 도회적인 모노톤 테일러링 룩',
+        '* 부드러운 뉴트럴 톤의 데일리 레이어드 룩',
+        '* 데님과 구조적인 자켓을 섞은 스마트 캐주얼 룩',
+        '',
+        '### 피하면 좋은 방향',
+        '* 상체와 하체 비율을 애매하게 끊는 중간 길이 상의',
+        '* 얼굴 주변 시선을 과하게 모으는 큰 장식과 복잡한 패턴',
+        '* 전체 실루엣을 무겁게 만드는 지나친 오버핏 중첩',
+        '',
+        '### 다음 쇼핑 우선순위',
+        '* 어깨선이 정리된 재킷 1벌',
+        '* 비율을 정리해 주는 하이웨이스트 하의 1벌',
+        '* 톤을 정돈하는 벨트 또는 미니 백',
+        '* 앞코가 정리된 슈즈 1켤레',
+        '* 레이어링용 기본 이너 2-3장',
+      ].join('\n')
+    : [
+        '### Summary',
+        'Gemini could not complete the in-app photo analysis from this location, so the app prepared a reusable style brief and external prompt instead.',
+        '',
+        '### Baseline Notes',
+        `* Input reference: height ${height}cm, weight ${weight}kg`,
+        '* Reuse the same uploaded photo in your external AI tool and ask it to keep the same face and body while changing only the styling.',
+        '* Treat the guidance below as a styling brief for prompt-based generation, not as a precise body-reading result.',
+        '',
+        '### Recommended Silhouettes',
+        '* High-waist proportions that keep a clean vertical line',
+        '* Structured outerwear or jackets with a defined shoulder and waist rhythm',
+        '* Minimal styling where fit, length, and layering read clearly',
+        '',
+        '### Three Outfit Directions',
+        '* Urban monochrome tailoring',
+        '* Soft neutral daily layering',
+        '* Smart casual denim with a structured jacket',
+        '',
+        '### Better To Avoid',
+        '* Mid-length tops that cut the proportions in an unclear place',
+        '* Heavy decoration or busy prints near the face',
+        '* Excessive oversized layering that makes the silhouette look heavy',
+        '',
+        '### Shopping Priorities',
+        '* One clean structured jacket',
+        '* One high-waist bottom',
+        '* One belt or compact bag to tighten the overall line',
+        '* One refined shoe with a clean toe shape',
+        '* Two or three base layering tops',
+      ].join('\n')
+
 const generateText = async ({
   env,
   prompt,
@@ -323,33 +399,59 @@ export async function onRequestPost(context: PagesContext) {
       preferredLocale,
     })
 
+    let report = ''
+    let reportNote = ''
+
     const initialResult = await generateText({
       prompt: reportPrompt,
       env,
       imageBase64,
       mimeType,
       preferredLocale,
-    })
+    }).catch((error: unknown) => {
+      if (!(error instanceof Error) || !isLocationRestrictedError(error.message)) {
+        throw error
+      }
 
-    let report = initialResult.text
-
-    if (initialResult.finishReason === 'MAX_TOKENS' && report) {
-      const continuationPrompt = [
-        reportPrompt,
-        'The previous answer was cut off by the token limit.',
-        'Do not repeat the existing content. Continue from the interruption point and finish the remaining sections.',
-        'Already written content:',
-        report,
-      ].join('\n\n')
-
-      const continuationResult = await generateText({
-        prompt: continuationPrompt,
-        env,
+      report = buildOfflineStyleFallbackReport({
+        height,
+        weight,
         preferredLocale,
       })
+      reportNote = isKoreanLocale(preferredLocale)
+        ? '현재 지역에서는 Gemini API 사용이 제한되어 있어, 서버 분석 대신 외부 생성형 AI에서 바로 쓸 수 있는 스타일 가이드와 프롬프트를 제공합니다.'
+        : 'Gemini use is restricted for this location, so the app prepared a reusable style guide and external prompt instead of an in-app analysis.'
 
-      if (continuationResult.text) {
-        report = `${report}\n\n${continuationResult.text}`.trim()
+      return null
+    })
+
+    if (initialResult) {
+      report = initialResult.text
+
+      if (initialResult.finishReason === 'MAX_TOKENS' && report) {
+        const continuationPrompt = [
+          reportPrompt,
+          'The previous answer was cut off by the token limit.',
+          'Do not repeat the existing content. Continue from the interruption point and finish the remaining sections.',
+          'Already written content:',
+          report,
+        ].join('\n\n')
+
+        try {
+          const continuationResult = await generateText({
+            prompt: continuationPrompt,
+            env,
+            preferredLocale,
+          })
+
+          if (continuationResult.text) {
+            report = `${report}\n\n${continuationResult.text}`.trim()
+          }
+        } catch (error) {
+          if (!(error instanceof Error) || !isLocationRestrictedError(error.message)) {
+            throw error
+          }
+        }
       }
     }
 
@@ -368,7 +470,16 @@ export async function onRequestPost(context: PagesContext) {
       preferredLocale,
     })
 
+    if (reportNote) {
+      return Response.json({
+        report,
+        prompt: styleImagePrompt,
+        note: reportNote,
+      })
+    }
+
     let lastImageStatus = 0
+    let lastImageErrorMessage = ''
 
     for (const model of IMAGE_MODELS) {
       const { response, json } = await callGemini({
@@ -403,13 +514,22 @@ export async function onRequestPost(context: PagesContext) {
       }
 
       lastImageStatus = response.status
+      lastImageErrorMessage = json?.error?.message ?? ''
+
+      if (isLocationRestrictedError(lastImageErrorMessage)) {
+        break
+      }
     }
 
     return Response.json({
       report,
       prompt: styleImagePrompt,
       note:
-        lastImageStatus === 429
+        isLocationRestrictedError(lastImageErrorMessage)
+          ? isKoreanLocale(preferredLocale)
+            ? '현재 지역에서는 Gemini 이미지 생성 API가 제한되어 있어, 아래에 외부 생성형 AI용 스타일 프롬프트만 제공합니다.'
+            : 'Gemini image generation is restricted for this location, so the app provided only an external style prompt below.'
+          : lastImageStatus === 429
           ? isKoreanLocale(preferredLocale)
             ? '스타일 이미지 생성은 현재 한도 또는 결제 상태 때문에 건너뛰고, 외부 생성형 AI에 붙여넣을 프롬프트만 제공했습니다.'
             : 'Style image generation was skipped because of the current quota or billing status, so only a prompt for your external AI tool was provided.'

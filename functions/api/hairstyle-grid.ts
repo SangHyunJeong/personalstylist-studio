@@ -365,6 +365,22 @@ export async function onRequestPost(context: PagesContext) {
       }
     }
 
+    if (isLocationRestrictedError(lastImageErrorMessage)) {
+      const description = buildOfflineHairFallbackDescription(preferredLocale)
+
+      return Response.json({
+        mode: 'prompt',
+        description,
+        prompt: buildHairExternalPrompt({
+          preferredLocale,
+          styleSummary: description,
+        }),
+        note: isKoreanLocale(preferredLocale)
+          ? '현재 지역에서는 Gemini 이미지 생성 API가 제한되어 있어, 아래에 외부 생성형 AI용 3x3 프롬프트를 준비했습니다.'
+          : 'Gemini image generation is restricted for this location, so the app prepared an external 3x3 hairstyle prompt below.',
+      })
+    }
+
     const fallbackPrompt = buildHairFallbackPromptRequest(preferredLocale)
     let fallbackResult = await callGemini({
       model: TEXT_FALLBACK_MODEL,
@@ -432,7 +448,7 @@ export async function onRequestPost(context: PagesContext) {
       }
     }
 
-    if (shouldFallbackToPrompt || isLocationRestrictedError(lastImageErrorMessage)) {
+    if (shouldFallbackToPrompt) {
       const description = buildOfflineHairFallbackDescription(preferredLocale)
 
       return Response.json({
@@ -443,8 +459,8 @@ export async function onRequestPost(context: PagesContext) {
           styleSummary: description,
         }),
         note: isKoreanLocale(preferredLocale)
-          ? '현재 지역에서는 Gemini 이미지 생성 API가 제한되어 있어, 외부 생성형 AI용 프롬프트로 전환했습니다.'
-          : 'Gemini image generation is restricted for this location, so the result was switched to an external-AI prompt.',
+          ? '이미지 결과를 끝까지 완성하지 못해, 외부 생성형 AI에서 다시 시도할 수 있는 3x3 프롬프트를 제공합니다.'
+          : 'The image result could not be completed, so the app provided an external 3x3 prompt you can retry in another AI tool.',
       })
     }
 

@@ -174,9 +174,9 @@ const localeCopy = {
     noImageSelected: '아직 선택된 이미지가 없습니다.',
     copySuccess: '프롬프트를 클립보드에 복사했습니다.',
     copyFailure: '클립보드 복사에 실패했습니다. 직접 선택해서 복사해 주세요.',
-    emailSendTitle: '이메일로 결과 받기',
+    emailSendTitle: '결제 이메일 자동 전송',
     emailSendDescription:
-      'Polar 결제에 사용한 이메일 주소로 현재 리포트를 전송합니다.',
+      '결과 생성이 끝나면 현재 리포트를 Polar 결제 이메일로 자동 전송합니다.',
     emailSendAction: '결제 이메일로 보내기',
     emailSendLoading: '이메일 전송 중...',
     emailSendUnavailable:
@@ -297,9 +297,9 @@ const localeCopy = {
     noImageSelected: 'No image selected yet.',
     copySuccess: 'Prompt copied to your clipboard.',
     copyFailure: 'Clipboard copy failed. Please copy it manually.',
-    emailSendTitle: 'Send result by email',
+    emailSendTitle: 'Automatic email delivery',
     emailSendDescription:
-      'Send the current report to the email address used during Polar checkout.',
+      'When generation finishes, the current report is sent automatically to the email used during Polar checkout.',
     emailSendAction: 'Send to checkout email',
     emailSendLoading: 'Sending email...',
     emailSendUnavailable:
@@ -990,7 +990,10 @@ function App() {
     setHairErrorMessage('')
   }
 
-  const runStyleGeneration = async (payload: StyleGenerationPayload) => {
+  const runStyleGeneration = async (
+    payload: StyleGenerationPayload,
+    deliveryEmail = purchaseEmail,
+  ) => {
     try {
       setIsStyleLoading(true)
       setStyleErrorMessage('')
@@ -1036,9 +1039,26 @@ function App() {
       setStylePrompt(data.prompt ?? '')
       setStyleNote(data.note ?? '')
 
+      const styleImageDataUrl =
+        data.imageBase64 && data.mimeType
+          ? `data:${data.mimeType};base64,${data.imageBase64}`
+          : ''
+
       if (data.imageBase64 && data.mimeType) {
-        setStyleResultImage(`data:${data.mimeType};base64,${data.imageBase64}`)
+        setStyleResultImage(styleImageDataUrl)
       }
+
+      void requestReportEmail({
+        kind: 'style',
+        toEmail: deliveryEmail,
+        content: data.report,
+        prompt: data.prompt ?? '',
+        note: data.note ?? '',
+        imageDataUrl: styleImageDataUrl,
+        setSending: setIsStyleEmailSending,
+        setMessage: setStyleEmailMessage,
+        setTone: setStyleEmailTone,
+      })
     } catch (error) {
       const fallback = copy.styleFetchError
       setStyleErrorMessage(error instanceof Error ? error.message : fallback)
@@ -1047,7 +1067,10 @@ function App() {
     }
   }
 
-  const runHairGeneration = async (payload: HairGenerationPayload) => {
+  const runHairGeneration = async (
+    payload: HairGenerationPayload,
+    deliveryEmail = purchaseEmail,
+  ) => {
     try {
       setIsHairLoading(true)
       setHairErrorMessage('')
@@ -1089,9 +1112,26 @@ function App() {
       setHairNote(data.note ?? '')
       setHairPrompt(data.prompt ?? '')
 
+      const hairImageDataUrl =
+        data.mode === 'image' && data.imageBase64 && data.mimeType
+          ? `data:${data.mimeType};base64,${data.imageBase64}`
+          : ''
+
       if (data.mode === 'image' && data.imageBase64 && data.mimeType) {
-        setHairResultImage(`data:${data.mimeType};base64,${data.imageBase64}`)
+        setHairResultImage(hairImageDataUrl)
       }
+
+      void requestReportEmail({
+        kind: 'hair',
+        toEmail: deliveryEmail,
+        content: data.description,
+        prompt: data.prompt ?? '',
+        note: data.note ?? '',
+        imageDataUrl: hairImageDataUrl,
+        setSending: setIsHairEmailSending,
+        setMessage: setHairEmailMessage,
+        setTone: setHairEmailTone,
+      })
     } catch (error) {
       const fallback = copy.hairFetchError
       setHairErrorMessage(error instanceof Error ? error.message : fallback)
@@ -1101,13 +1141,16 @@ function App() {
   }
 
   const resumePendingCheckout = useEffectEvent(
-    async (pendingCheckout: PendingCheckoutPayload | null) => {
+    async (
+      pendingCheckout: PendingCheckoutPayload | null,
+      deliveryEmail?: string,
+    ) => {
       if (pendingCheckout?.kind === 'style') {
-        await runStyleGeneration(pendingCheckout)
+        await runStyleGeneration(pendingCheckout, deliveryEmail)
       }
 
       if (pendingCheckout?.kind === 'hair') {
-        await runHairGeneration(pendingCheckout)
+        await runHairGeneration(pendingCheckout, deliveryEmail)
       }
     },
   )
@@ -1257,6 +1300,7 @@ function App() {
 
   const requestReportEmail = async ({
     kind,
+    toEmail,
     content,
     prompt,
     note,
@@ -1266,6 +1310,7 @@ function App() {
     setTone,
   }: {
     kind: 'style' | 'hair'
+    toEmail?: string
     content: string
     prompt: string
     note: string
@@ -1274,7 +1319,9 @@ function App() {
     setMessage: (value: string) => void
     setTone: (value: 'success' | 'error' | 'fallback') => void
   }) => {
-    if (!purchaseEmail.trim()) {
+    const deliveryEmail = toEmail?.trim() || purchaseEmail.trim()
+
+    if (!deliveryEmail) {
       setTone('error')
       setMessage(copy.emailSendUnavailable)
       return
@@ -1292,7 +1339,7 @@ function App() {
         body: JSON.stringify({
           kind,
           language,
-          toEmail: purchaseEmail,
+          toEmail: deliveryEmail,
           content,
           prompt,
           note,
@@ -1316,32 +1363,6 @@ function App() {
     } finally {
       setSending(false)
     }
-  }
-
-  const sendStyleReportEmail = async () => {
-    await requestReportEmail({
-      kind: 'style',
-      content: styleReport,
-      prompt: stylePrompt,
-      note: styleNote,
-      imageDataUrl: styleResultImage,
-      setSending: setIsStyleEmailSending,
-      setMessage: setStyleEmailMessage,
-      setTone: setStyleEmailTone,
-    })
-  }
-
-  const sendHairReportEmail = async () => {
-    await requestReportEmail({
-      kind: 'hair',
-      content: hairDescription,
-      prompt: hairPrompt,
-      note: hairNote,
-      imageDataUrl: hairResultImage,
-      setSending: setIsHairEmailSending,
-      setMessage: setHairEmailMessage,
-      setTone: setHairEmailTone,
-    })
   }
 
   const createReportFile = async (
@@ -1585,7 +1606,7 @@ function App() {
           clearPendingEntryView()
 
           if (pendingCheckout) {
-            await resumePendingCheckout(pendingCheckout)
+            await resumePendingCheckout(pendingCheckout, data.customerEmail ?? '')
           } else if (pendingEntryView) {
             setView(pendingEntryView)
           }
@@ -1722,13 +1743,11 @@ function App() {
     message,
     tone,
     isSending,
-    onSend,
   }: {
     hasContent: boolean
     message: string
     tone: 'success' | 'error' | 'fallback'
     isSending: boolean
-    onSend: () => Promise<void>
   }) => {
     if (!hasContent) {
       return null
@@ -1749,17 +1768,9 @@ function App() {
           <strong>{copy.emailSendTarget}</strong>
           <span>{purchaseEmail || copy.emailSendUnavailable}</span>
         </p>
-        <button
-          className="utility-button report-action-button"
-          disabled={isSending || !purchaseEmail}
-          onClick={() => {
-            void onSend()
-          }}
-          type="button"
-        >
-          <SparkleIcon className="button-icon" />
-          <span>{isSending ? copy.emailSendLoading : copy.emailSendAction}</span>
-        </button>
+        {isSending ? (
+          <p className="status-message fallback">{copy.emailSendLoading}</p>
+        ) : null}
         {message ? <p className={`status-message ${tone}`}>{message}</p> : null}
       </section>
     )
@@ -2251,7 +2262,6 @@ function App() {
                 message: styleEmailMessage,
                 tone: styleEmailTone,
                 isSending: isStyleEmailSending,
-                onSend: sendStyleReportEmail,
               })}
 
               {renderPromptUtility({
@@ -2372,7 +2382,6 @@ function App() {
                 message: hairEmailMessage,
                 tone: hairEmailTone,
                 isSending: isHairEmailSending,
-                onSend: sendHairReportEmail,
               })}
 
               {renderPromptUtility({
