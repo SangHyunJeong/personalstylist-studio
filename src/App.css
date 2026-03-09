@@ -3,19 +3,21 @@
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   gap: 2rem;
   align-items: start;
+  width: min(100%, 1480px);
   min-height: 100vh;
+  margin: 0 auto;
   padding: 2rem;
 }
 
 .hero-panel,
 .form-panel {
   position: relative;
+  min-width: 0;
+  overflow: visible;
   border-radius: 32px;
 }
 
 .hero-panel {
-  position: sticky;
-  top: 2rem;
   padding: 3.5rem;
   background:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.24), transparent 32%),
@@ -31,14 +33,15 @@
 }
 
 .hero-panel h1 {
-  max-width: 12ch;
+  max-width: 100%;
   margin: 0;
-  font-size: clamp(2.7rem, 5vw, 4.8rem);
-  line-height: 1;
+  font-size: clamp(2.3rem, 4vw, 4.4rem);
+  line-height: 1.04;
   letter-spacing: -0.05em;
   word-break: keep-all;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  text-wrap: balance;
 }
 
 .hero-copy {
@@ -185,7 +188,8 @@
 }
 
 .input-wrap {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
   padding: 0 1rem;
@@ -210,8 +214,12 @@
 }
 
 .input-wrap span {
+  min-width: 2.4ch;
   font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
   color: #7d756d;
+  flex-shrink: 0;
 }
 
 .submit-button {
@@ -308,16 +316,13 @@
   }
 
   .hero-panel {
-    position: relative;
-    top: auto;
     padding: 2rem;
   }
 }
 
 @media (max-width: 640px) {
   .hero-panel h1 {
-    max-width: 100%;
-    font-size: 2.8rem;
+    font-size: 2.4rem;
   }
 
   .metrics-grid {
