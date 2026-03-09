@@ -30,11 +30,13 @@
 }
 
 .hero-panel h1 {
-  max-width: 12ch;
+  max-width: none;
   margin: 0;
-  font-size: clamp(2.8rem, 6vw, 5.5rem);
+  font-size: clamp(2.35rem, 4.6vw, 5rem);
   line-height: 0.94;
   letter-spacing: -0.05em;
+  word-break: keep-all;
+  white-space: nowrap;
 }
 
 .hero-copy {
@@ -93,6 +95,16 @@
   display: grid;
   gap: 1.4rem;
   margin-top: 2rem;
+}
+
+.photo-field {
+  display: block;
+}
+
+.photo-field.is-dragging .photo-dropzone {
+  transform: translateY(-2px) scale(1.01);
+  border-color: #40536d;
+  box-shadow: 0 20px 36px rgba(31, 60, 136, 0.18);
 }
 
 .field-label {
@@ -211,9 +223,75 @@
   font-weight: 700;
 }
 
+.submit-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .submit-button:hover {
   border: 0;
   filter: brightness(1.05);
+}
+
+.status-message {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  font-size: 0.94rem;
+  line-height: 1.5;
+}
+
+.status-message.error {
+  background: rgba(180, 56, 43, 0.08);
+  color: #9d2f22;
+}
+
+.report-panel {
+  margin-top: 1.8rem;
+  padding: 1.4rem;
+  border: 1px solid #eadcd1;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.report-header p {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #af6f4d;
+}
+
+.report-header h3 {
+  margin: 0.5rem 0 0;
+  font-size: 1.5rem;
+  color: #1e2430;
+}
+
+.report-placeholder,
+.report-body {
+  margin-top: 1rem;
+}
+
+.report-placeholder {
+  padding: 1.1rem;
+  border-radius: 18px;
+  background: #fff9f4;
+  line-height: 1.7;
+  color: #6f7683;
+}
+
+.report-body {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.report-body p {
+  margin: 0;
+  line-height: 1.7;
+  color: #2c3444;
+  white-space: pre-wrap;
 }
 
 @media (max-width: 960px) {
@@ -236,6 +314,7 @@
   .hero-panel h1 {
     max-width: 100%;
     font-size: 2.8rem;
+    white-space: normal;
   }
 
   .metrics-grid {
