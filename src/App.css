@@ -359,7 +359,7 @@
   white-space: pre-wrap;
 }
 
-.hair-result {
+.generated-result {
   display: grid;
   gap: 1.2rem;
   margin-top: 1rem;
@@ -374,15 +374,14 @@
   background: var(--field-bg);
 }
 
-.prompt-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+.prompt-panel strong {
+  color: var(--text-strong);
 }
 
-.prompt-header strong {
-  color: var(--text-strong);
+.prompt-description {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--text-muted);
 }
 
 .copy-button {
@@ -394,17 +393,7 @@
   font-weight: 700;
 }
 
-.prompt-box {
-  margin: 0;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
-  line-height: 1.7;
-  color: var(--text-body);
-}
-
-.hair-result-image {
+.generated-result-image {
   width: 100%;
   border-radius: 22px;
   border: 1px solid var(--surface-border);
@@ -444,11 +433,6 @@
 
   .theme-toggle {
     width: 100%;
-  }
-
-  .prompt-header {
-    align-items: flex-start;
-    flex-direction: column;
   }
 
   .copy-button {

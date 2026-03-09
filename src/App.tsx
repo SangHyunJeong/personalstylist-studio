@@ -9,6 +9,10 @@ import './App.css'
 
 type StyleReportResponse = {
   report: string
+  imageBase64?: string
+  mimeType?: string
+  prompt?: string
+  note?: string
   error?: string
 }
 
@@ -65,6 +69,10 @@ function App() {
   const [stylePhotoName, setStylePhotoName] = useState('아직 선택된 사진이 없습니다')
   const [stylePhotoPreview, setStylePhotoPreview] = useState('')
   const [styleReport, setStyleReport] = useState('')
+  const [styleResultImage, setStyleResultImage] = useState('')
+  const [stylePrompt, setStylePrompt] = useState('')
+  const [styleNote, setStyleNote] = useState('')
+  const [styleCopyMessage, setStyleCopyMessage] = useState('')
   const [styleErrorMessage, setStyleErrorMessage] = useState('')
   const [isStyleLoading, setIsStyleLoading] = useState(false)
   const [isStyleDragging, setIsStyleDragging] = useState(false)
@@ -76,6 +84,7 @@ function App() {
   const [hairResultImage, setHairResultImage] = useState('')
   const [hairPrompt, setHairPrompt] = useState('')
   const [hairNote, setHairNote] = useState('')
+  const [hairCopyMessage, setHairCopyMessage] = useState('')
   const [hairErrorMessage, setHairErrorMessage] = useState('')
   const [isHairLoading, setIsHairLoading] = useState(false)
   const [isHairDragging, setIsHairDragging] = useState(false)
@@ -239,6 +248,10 @@ function App() {
       setIsStyleLoading(true)
       setStyleErrorMessage('')
       setStyleReport('')
+      setStyleResultImage('')
+      setStylePrompt('')
+      setStyleNote('')
+      setStyleCopyMessage('')
 
       const imageBase64 = await readFileAsBase64(stylePhotoFile)
 
@@ -263,6 +276,12 @@ function App() {
       }
 
       setStyleReport(data.report)
+      setStylePrompt(data.prompt ?? '')
+      setStyleNote(data.note ?? '')
+
+      if (data.imageBase64 && data.mimeType) {
+        setStyleResultImage(`data:${data.mimeType};base64,${data.imageBase64}`)
+      }
     } catch (error) {
       const fallback = '스타일 보고서를 가져오는 중 문제가 발생했습니다.'
       setStyleErrorMessage(error instanceof Error ? error.message : fallback)
@@ -286,6 +305,7 @@ function App() {
       setHairResultImage('')
       setHairPrompt('')
       setHairNote('')
+      setHairCopyMessage('')
 
       const imageBase64 = await readFileAsBase64(hairPhotoFile)
 
@@ -309,13 +329,10 @@ function App() {
 
       setHairDescription(data.description)
       setHairNote(data.note ?? '')
+      setHairPrompt(data.prompt ?? '')
 
       if (data.mode === 'image' && data.imageBase64 && data.mimeType) {
         setHairResultImage(`data:${data.mimeType};base64,${data.imageBase64}`)
-      }
-
-      if (data.mode === 'prompt') {
-        setHairPrompt(data.prompt ?? data.description)
       }
     } catch (error) {
       const fallback = '헤어스타일 추천 이미지를 가져오는 중 문제가 발생했습니다.'
@@ -337,17 +354,29 @@ function App() {
     })
   }
 
-  const copyHairPrompt = async () => {
-    if (!hairPrompt) {
+  const copyText = async (
+    text: string,
+    onSuccess: (message: string) => void,
+    onFailure: (message: string) => void,
+  ) => {
+    if (!text) {
       return
     }
 
     try {
-      await navigator.clipboard.writeText(hairPrompt)
-      setHairNote('프롬프트를 클립보드에 복사했습니다.')
+      await navigator.clipboard.writeText(text)
+      onSuccess('프롬프트를 클립보드에 복사했습니다.')
     } catch {
-      setHairNote('클립보드 복사에 실패했습니다. 직접 선택해서 복사해 주세요.')
+      onFailure('클립보드 복사에 실패했습니다. 직접 선택해서 복사해 주세요.')
     }
+  }
+
+  const copyStylePrompt = async () => {
+    await copyText(stylePrompt, setStyleCopyMessage, setStyleCopyMessage)
+  }
+
+  const copyHairPrompt = async () => {
+    await copyText(hairPrompt, setHairCopyMessage, setHairCopyMessage)
   }
 
   const renderPhotoField = ({
@@ -459,7 +488,7 @@ function App() {
             <h1>체형에 맞는 스타일 보고서를 생성해보세요.</h1>
             <p className="hero-copy">
               체형 정보와 얼굴 인상을 함께 참고해, 옷의 핏과 실루엣, 코디 방향을
-              텍스트 보고서로 정리해드립니다.
+              텍스트 보고서로 정리하고, 가능하면 착장 이미지를 함께 생성합니다.
             </p>
           </>
         ) : (
@@ -551,15 +580,40 @@ function App() {
             </div>
 
             {styleReport ? (
-              <article className="report-body">
-                {styleReport.split('\n').map((line, index) => (
-                  <p key={`${line}-${index}`}>{renderRichTextLine(line)}</p>
-                ))}
-              </article>
+              <div className="generated-result">
+                {styleNote ? <p className="status-message fallback">{styleNote}</p> : null}
+                {styleCopyMessage ? (
+                  <p className="status-message fallback">{styleCopyMessage}</p>
+                ) : null}
+                {styleResultImage ? (
+                  <img
+                    alt="스타일 보고서를 바탕으로 생성한 착장 이미지"
+                    className="generated-result-image"
+                    src={styleResultImage}
+                  />
+                ) : null}
+                {stylePrompt ? (
+                  <div className="prompt-panel">
+                    <strong>외부 생성형 AI에서 룩 이미지 다시 생성해보기</strong>
+                    <p className="prompt-description">
+                      내 생성형 AI로 가져가서 이미지 생성할 프롬프트를 복사합니다.
+                    </p>
+                    <button className="copy-button" onClick={copyStylePrompt} type="button">
+                      내 생성형 AI로 가져가서 이미지 생성할 프롬프트 복사하기
+                    </button>
+                  </div>
+                ) : null}
+                <article className="report-body">
+                  {styleReport.split('\n').map((line, index) => (
+                    <p key={`${line}-${index}`}>{renderRichTextLine(line)}</p>
+                  ))}
+                </article>
+              </div>
             ) : (
               <div className="report-placeholder">
                 사진과 체형 정보를 입력한 뒤 보고서를 생성하면, 실루엣 분석과 추천
-                룩 방향이 여기에 표시됩니다.
+                룩 방향이 여기에 표시되고, 가능하면 착장 이미지와 복사 프롬프트도
+                함께 제공됩니다.
               </div>
             )}
           </section>
@@ -618,32 +672,30 @@ function App() {
               <h3>3x3 헤어스타일 추천</h3>
             </div>
 
-            {hairResultImage ? (
-              <div className="hair-result">
+            {hairResultImage || hairPrompt ? (
+              <div className="generated-result">
                 {hairNote ? <p className="status-message fallback">{hairNote}</p> : null}
-                <img
-                  alt="추천된 3x3 헤어스타일 그리드"
-                  className="hair-result-image"
-                  src={hairResultImage}
-                />
-                <article className="report-body">
-                  {hairDescription.split('\n').map((line, index) => (
-                    <p key={`${line}-${index}`}>{renderRichTextLine(line)}</p>
-                  ))}
-                </article>
-              </div>
-            ) : hairPrompt ? (
-              <div className="hair-result">
-                {hairNote ? <p className="status-message fallback">{hairNote}</p> : null}
-                <div className="prompt-panel">
-                  <div className="prompt-header">
-                    <strong>외부 툴용 복사 프롬프트</strong>
+                {hairCopyMessage ? (
+                  <p className="status-message fallback">{hairCopyMessage}</p>
+                ) : null}
+                {hairResultImage ? (
+                  <img
+                    alt="추천된 3x3 헤어스타일 그리드"
+                    className="generated-result-image"
+                    src={hairResultImage}
+                  />
+                ) : null}
+                {hairPrompt ? (
+                  <div className="prompt-panel">
+                    <strong>외부 생성형 AI에서 헤어 이미지 다시 생성해보기</strong>
+                    <p className="prompt-description">
+                      내 생성형 AI로 가져가서 이미지 생성할 프롬프트를 복사합니다.
+                    </p>
                     <button className="copy-button" onClick={copyHairPrompt} type="button">
-                      프롬프트 복사
+                      내 생성형 AI로 가져가서 이미지 생성할 프롬프트 복사하기
                     </button>
                   </div>
-                  <pre className="prompt-box">{hairPrompt}</pre>
-                </div>
+                ) : null}
                 <article className="report-body">
                   {hairDescription.split('\n').map((line, index) => (
                     <p key={`${line}-${index}`}>{renderRichTextLine(line)}</p>

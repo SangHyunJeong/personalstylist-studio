@@ -146,6 +146,28 @@ const buildHairFallbackPromptRequest = (preferredLocale?: string) =>
     `사용자 locale: ${preferredLocale || 'en-US'}`,
   ].join('\n')
 
+const buildHairExternalPrompt = ({
+  preferredLocale,
+  styleSummary,
+}: {
+  preferredLocale?: string
+  styleSummary?: string
+}) =>
+  [
+    'Use the attached reference photo of the same person.',
+    'Keep the exact same face, identity, skin tone, age impression, and facial structure.',
+    'Do not change the face. Change hair only.',
+    'Create a single 3x3 collage containing nine distinct hairstyles that all suit this person.',
+    'Make the result photorealistic, salon-reference quality, and clearly varied in length, texture, parting, fringe, volume, and mood.',
+    'Preserve realism and consistency across all nine variations.',
+    styleSummary
+      ? `Use this hairstyle direction and recommendation summary as guidance:\n${styleSummary}`
+      : '',
+    `User locale: ${preferredLocale || 'en-US'}.`,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+
 const buildGenericHairFallbackPromptRequest = (preferredLocale?: string) =>
   [
     '너는 최고의 헤어스타일리스트야.',
@@ -224,6 +246,10 @@ export async function onRequestPost(context: PagesContext) {
             imageBase64: imageResult.imageBase64,
             mimeType: imageResult.mimeType,
             description,
+            prompt: buildHairExternalPrompt({
+              preferredLocale,
+              styleSummary: description,
+            }),
           })
         }
 
@@ -265,7 +291,10 @@ export async function onRequestPost(context: PagesContext) {
         return Response.json({
           mode: 'prompt',
           description,
-          prompt: description,
+          prompt: buildHairExternalPrompt({
+            preferredLocale,
+            styleSummary: description,
+          }),
           note: shouldFallbackToPrompt
             ? '이미지 생성 한도 문제로 텍스트 프롬프트 추천으로 전환했습니다.'
             : '이미지 결과를 완성하지 못해 텍스트 프롬프트 추천으로 전환했습니다.',
@@ -289,7 +318,10 @@ export async function onRequestPost(context: PagesContext) {
         return Response.json({
           mode: 'prompt',
           description,
-          prompt: description,
+          prompt: buildHairExternalPrompt({
+            preferredLocale,
+            styleSummary: description,
+          }),
           note: '이미지 생성 한도 또는 이미지 처리 문제로 텍스트 프롬프트 추천으로 전환했습니다.',
         })
       }
