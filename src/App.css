@@ -603,8 +603,10 @@
 }
 
 .generated-grid-image {
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
+  display: block;
+  height: auto;
+  max-height: min(75vh, 42rem);
+  object-fit: contain;
 }
 
 .utility-card {
