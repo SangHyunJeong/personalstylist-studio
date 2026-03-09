@@ -58,6 +58,7 @@ type HairGenerationPayload = {
 }
 
 type PendingCheckoutPayload = StyleGenerationPayload | HairGenerationPayload
+type ProtectedView = Extract<View, 'style' | 'hair'>
 
 type Theme = 'light' | 'dark'
 type Language = 'ko' | 'en'
@@ -71,6 +72,7 @@ const homeHairImage =
 
 const PURCHASE_VERIFIED_KEY = 'polar_purchase_verified'
 const PENDING_CHECKOUT_KEY = 'polar_pending_checkout_payload'
+const PENDING_ENTRY_VIEW_KEY = 'polar_pending_entry_view'
 
 const getInitialTheme = (): Theme => {
   if (typeof window === 'undefined') {
@@ -217,9 +219,9 @@ const localeCopy = {
     checkoutPendingBody:
       '결제 후 돌아왔지만 Polar에서 아직 성공 상태가 확정되지 않았습니다. 잠시 후 다시 새로고침해 보세요.',
     navHome: 'HOME',
-    navStylist: 'STYLIST',
-    navGallery: 'REPORTS',
-    navProfile: 'BILLING',
+    navStyle: 'STYLE',
+    navHair: 'HAIR',
+    navBilling: 'BILLING',
   },
   en: {
     languageLabel: 'Language',
@@ -320,9 +322,9 @@ const localeCopy = {
     checkoutPendingBody:
       'You returned from checkout, but Polar has not marked this session as succeeded yet. Please refresh in a moment.',
     navHome: 'HOME',
-    navStylist: 'STYLIST',
-    navGallery: 'REPORTS',
-    navProfile: 'BILLING',
+    navStyle: 'STYLE',
+    navHair: 'HAIR',
+    navBilling: 'BILLING',
   },
 } as const
 
@@ -488,27 +490,6 @@ const HomeIcon = ({ className = '' }: { className?: string }) => (
   </Icon>
 )
 
-const WandIcon = ({ className = '' }: { className?: string }) => (
-  <Icon className={className}>
-    <path
-      d="m5.5 17.75 6.65-6.65M14.85 8.4l3.65-3.65M15.95 4.75l.7 1.7 1.7.7-1.7.7-.7 1.7-.7-1.7-1.7-.7 1.7-.7.7-1.7ZM7.5 9l.95 2.2 2.2.95-2.2.95-.95 2.2-.95-2.2-2.2-.95 2.2-.95L7.5 9Z"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="1.6"
-    />
-  </Icon>
-)
-
-const GridIcon = ({ className = '' }: { className?: string }) => (
-  <Icon className={className}>
-    <rect fill="currentColor" height="5.25" rx="1.1" width="5.25" x="4" y="4" />
-    <rect fill="currentColor" height="5.25" rx="1.1" width="5.25" x="14.75" y="4" />
-    <rect fill="currentColor" height="5.25" rx="1.1" width="5.25" x="4" y="14.75" />
-    <rect fill="currentColor" height="5.25" rx="1.1" width="5.25" x="14.75" y="14.75" />
-  </Icon>
-)
-
 const PersonIcon = ({ className = '' }: { className?: string }) => (
   <Icon className={className}>
     <circle cx="12" cy="8.25" fill="currentColor" r="3.25" />
@@ -523,9 +504,9 @@ const PersonIcon = ({ className = '' }: { className?: string }) => (
 
 const navItems = [
   { key: 'home', icon: HomeIcon },
-  { key: 'stylist', icon: WandIcon },
-  { key: 'gallery', icon: GridIcon },
-  { key: 'profile', icon: PersonIcon },
+  { key: 'style', icon: AnalyticsIcon },
+  { key: 'hair', icon: ScissorsIcon },
+  { key: 'billing', icon: PersonIcon },
 ] as const
 
 function App() {
@@ -689,6 +670,24 @@ function App() {
 
   const clearPendingCheckout = () => {
     window.localStorage.removeItem(PENDING_CHECKOUT_KEY)
+  }
+
+  const persistPendingEntryView = (nextView: ProtectedView) => {
+    window.localStorage.setItem(PENDING_ENTRY_VIEW_KEY, nextView)
+  }
+
+  const readPendingEntryView = (): ProtectedView | null => {
+    const rawValue = window.localStorage.getItem(PENDING_ENTRY_VIEW_KEY)
+
+    if (rawValue === 'style' || rawValue === 'hair') {
+      return rawValue
+    }
+
+    return null
+  }
+
+  const clearPendingEntryView = () => {
+    window.localStorage.removeItem(PENDING_ENTRY_VIEW_KEY)
   }
 
   const toggleTheme = () => {
@@ -1000,6 +999,19 @@ function App() {
     await copyText(hairPrompt, setHairCopyMessage, setHairCopyMessage)
   }
 
+  const beginProtectedEntry = async (targetView: ProtectedView) => {
+    setCheckoutErrorMessage('')
+
+    if (isPurchaseVerified) {
+      setView(targetView)
+      return
+    }
+
+    clearPendingCheckout()
+    persistPendingEntryView(targetView)
+    await startCheckout()
+  }
+
   const startCheckout = async () => {
     try {
       setIsCheckoutLoading(true)
@@ -1067,8 +1079,15 @@ function App() {
           setIsPurchaseVerified(true)
 
           const pendingCheckout = readPendingCheckout()
+          const pendingEntryView = readPendingEntryView()
           clearPendingCheckout()
-          await resumePendingCheckout(pendingCheckout)
+          clearPendingEntryView()
+
+          if (pendingCheckout) {
+            await resumePendingCheckout(pendingCheckout)
+          } else if (pendingEntryView) {
+            setView(pendingEntryView)
+          }
 
           url.searchParams.delete('checkout')
           url.searchParams.delete('checkout_id')
@@ -1097,13 +1116,7 @@ function App() {
     }
   }, [copy.checkoutError, copy.checkoutPendingBody, copy.checkoutVerifiedBody, preferredLocale])
 
-  const activeNav = view === 'style'
-    ? 'gallery'
-    : view === 'hair'
-      ? 'stylist'
-      : view === 'billing'
-        ? 'profile'
-        : 'home'
+  const activeNav = view
 
   const renderPhotoField = ({
     label,
@@ -1381,7 +1394,9 @@ function App() {
               <section className="selection-stack">
                 <button
                   className="selection-card"
-                  onClick={() => setView('style')}
+                  onClick={() => {
+                    void beginProtectedEntry('style')
+                  }}
                   type="button"
                 >
                   <div
@@ -1404,7 +1419,9 @@ function App() {
 
                 <button
                   className="selection-card"
-                  onClick={() => setView('hair')}
+                  onClick={() => {
+                    void beginProtectedEntry('hair')
+                  }}
                   type="button"
                 >
                   <div
@@ -1668,17 +1685,15 @@ function App() {
             const handleClick = () => {
               if (item.key === 'home') {
                 setView('home')
+                return
               }
 
-              if (item.key === 'stylist') {
-                setView('hair')
+              if (item.key === 'style' || item.key === 'hair') {
+                void beginProtectedEntry(item.key)
+                return
               }
 
-              if (item.key === 'gallery') {
-                setView('style')
-              }
-
-              if (item.key === 'profile') {
+              if (item.key === 'billing') {
                 setView('billing')
               }
             }
@@ -1694,11 +1709,11 @@ function App() {
                 <span>
                   {item.key === 'home'
                     ? copy.navHome
-                    : item.key === 'stylist'
-                      ? copy.navStylist
-                      : item.key === 'gallery'
-                        ? copy.navGallery
-                        : copy.navProfile}
+                    : item.key === 'style'
+                      ? copy.navStyle
+                      : item.key === 'hair'
+                        ? copy.navHair
+                        : copy.navBilling}
                 </span>
               </button>
             )
