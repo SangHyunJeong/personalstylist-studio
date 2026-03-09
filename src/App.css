@@ -67,6 +67,7 @@
 
 .topbar-title {
   margin: 0;
+  min-width: 0;
   font-size: 1rem;
   font-weight: 700;
   text-align: center;
@@ -227,6 +228,8 @@
 }
 
 .selection-heading h3 {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   font-size: 1.6rem;
   line-height: 1.08;
@@ -567,6 +570,19 @@
   gap: 0.65rem;
 }
 
+.report-action-card {
+  gap: 0.8rem;
+}
+
+.report-action-group {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.report-action-button {
+  min-height: 3.1rem;
+}
+
 .visual-caption {
   margin: 0;
   font-weight: 700;
@@ -622,6 +638,10 @@
 .utility-copy h4 {
   margin: 0;
   color: var(--text-strong);
+}
+
+.utility-copy > div {
+  min-width: 0;
 }
 
 .utility-copy p {
@@ -749,6 +769,56 @@
 .nav-icon {
   width: 1.15rem;
   height: 1.15rem;
+}
+
+.app-frame[lang='ko'] :is(
+  .topbar-title,
+  .hero-title,
+  .hero-description,
+  .compliance-banner strong,
+  .compliance-banner p,
+  .selection-heading h3,
+  .selection-content p,
+  .upload-empty strong,
+  .upload-empty p,
+  .metric-field span,
+  .report-card-header h3,
+  .center-header h3,
+  .rich-paragraph,
+  .rich-heading,
+  .rich-list-item p,
+  .utility-copy h4,
+  .utility-copy p,
+  .status-message,
+  .empty-state,
+  .visual-caption,
+  .action-button,
+  .utility-button,
+  .primary-cta,
+  .secondary-cta
+) {
+  word-break: keep-all;
+  line-break: strict;
+  overflow-wrap: break-word;
+}
+
+.app-frame[lang='ko'] :is(
+  .hero-title,
+  .hero-description,
+  .selection-heading h3,
+  .selection-content p,
+  .rich-paragraph,
+  .rich-heading,
+  .rich-list-item p,
+  .utility-copy p,
+  .status-message,
+  .empty-state
+) {
+  text-wrap: pretty;
+}
+
+.app-frame[lang='ko'] .hero-title {
+  text-wrap: pretty;
 }
 
 @media (min-width: 48rem) {

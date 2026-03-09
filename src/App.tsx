@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import type {
   CSSProperties,
   ChangeEvent,
@@ -6,6 +6,7 @@ import type {
   FormEvent,
   ReactNode,
 } from 'react'
+import { toBlob } from 'html-to-image'
 import './App.css'
 
 type StyleReportResponse = {
@@ -136,6 +137,16 @@ const localeCopy = {
     noImageSelected: '아직 선택된 이미지가 없습니다.',
     copySuccess: '프롬프트를 클립보드에 복사했습니다.',
     copyFailure: '클립보드 복사에 실패했습니다. 직접 선택해서 복사해 주세요.',
+    reportImageSaveAction: '리포트를 이미지로 저장하기',
+    reportImageSaveLoading: '이미지 저장 준비 중...',
+    reportImageShareAction: '외부로 공유하기',
+    reportImageShareLoading: '공유 준비 중...',
+    reportImageSaveSuccess: '리포트 이미지를 저장했습니다.',
+    reportImageExportError: '리포트를 이미지로 저장하지 못했습니다.',
+    reportImageShareUnsupported:
+      '이 브라우저에서는 리포트 이미지 공유를 지원하지 않습니다. 먼저 저장해 주세요.',
+    styleReportShareTitle: '체형 스타일 보고서',
+    hairReportShareTitle: '헤어스타일 추천 리포트',
     encodeFailure: '이미지 인코딩에 실패했습니다.',
     imageDataMissing: '이미지 데이터를 읽을 수 없습니다.',
     imageReadFailure: '이미지 파일을 읽는 중 오류가 발생했습니다.',
@@ -238,6 +249,16 @@ const localeCopy = {
     noImageSelected: 'No image selected yet.',
     copySuccess: 'Prompt copied to your clipboard.',
     copyFailure: 'Clipboard copy failed. Please copy it manually.',
+    reportImageSaveAction: 'Save report as image',
+    reportImageSaveLoading: 'Preparing image...',
+    reportImageShareAction: 'Share externally',
+    reportImageShareLoading: 'Preparing share...',
+    reportImageSaveSuccess: 'The report image has been saved.',
+    reportImageExportError: 'Unable to export the report as an image.',
+    reportImageShareUnsupported:
+      'This browser cannot share report images directly. Please save the image first.',
+    styleReportShareTitle: 'Body Style Report',
+    hairReportShareTitle: 'Hairstyle Recommendation Report',
     encodeFailure: 'Failed to encode the image.',
     imageDataMissing: 'Unable to read the image data.',
     imageReadFailure: 'Something went wrong while reading the image file.',
@@ -476,6 +497,32 @@ const CopyIcon = ({ className = '' }: { className?: string }) => (
   </Icon>
 )
 
+const DownloadIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <path
+      d="M12 4.5v9M8.5 10.25 12 13.5l3.5-3.25M5.5 18.25h13"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    />
+  </Icon>
+)
+
+const ShareIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <circle cx="18" cy="5.75" fill="currentColor" r="2" />
+    <circle cx="6" cy="12" fill="currentColor" r="2" />
+    <circle cx="18" cy="18.25" fill="currentColor" r="2" />
+    <path
+      d="M7.75 11.1 16.2 6.65M7.75 12.9l8.45 4.45"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeWidth="1.7"
+    />
+  </Icon>
+)
+
 const CheckIcon = ({ className = '' }: { className?: string }) => (
   <Icon className={className}>
     <circle cx="12" cy="12" fill="currentColor" opacity=".14" r="9" />
@@ -521,6 +568,8 @@ function App() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const [language, setLanguage] = useState<Language>(getInitialLanguage)
   const [view, setView] = useState<View>(getInitialView)
+  const styleReportCaptureRef = useRef<HTMLElement | null>(null)
+  const hairReportCaptureRef = useRef<HTMLElement | null>(null)
 
   const [height, setHeight] = useState('')
   const [weight, setWeight] = useState('')
@@ -532,6 +581,9 @@ function App() {
   const [stylePrompt, setStylePrompt] = useState('')
   const [styleNote, setStyleNote] = useState('')
   const [styleCopyMessage, setStyleCopyMessage] = useState('')
+  const [styleAssetMessage, setStyleAssetMessage] = useState('')
+  const [styleAssetTone, setStyleAssetTone] = useState<'success' | 'error' | 'fallback'>('success')
+  const [styleAssetAction, setStyleAssetAction] = useState<'idle' | 'save' | 'share'>('idle')
   const [styleErrorMessage, setStyleErrorMessage] = useState('')
   const [isStyleLoading, setIsStyleLoading] = useState(false)
   const [isStyleDragging, setIsStyleDragging] = useState(false)
@@ -544,6 +596,9 @@ function App() {
   const [hairPrompt, setHairPrompt] = useState('')
   const [hairNote, setHairNote] = useState('')
   const [hairCopyMessage, setHairCopyMessage] = useState('')
+  const [hairAssetMessage, setHairAssetMessage] = useState('')
+  const [hairAssetTone, setHairAssetTone] = useState<'success' | 'error' | 'fallback'>('success')
+  const [hairAssetAction, setHairAssetAction] = useState<'idle' | 'save' | 'share'>('idle')
   const [hairErrorMessage, setHairErrorMessage] = useState('')
   const [isHairLoading, setIsHairLoading] = useState(false)
   const [isHairDragging, setIsHairDragging] = useState(false)
@@ -562,6 +617,7 @@ function App() {
 
   useEffect(() => {
     window.localStorage.setItem('language', language)
+    document.documentElement.lang = language === 'ko' ? 'ko' : 'en'
   }, [language])
 
   useEffect(() => {
@@ -761,6 +817,8 @@ function App() {
       setStylePrompt('')
       setStyleNote('')
       setStyleCopyMessage('')
+      setStyleAssetMessage('')
+      setStyleAssetAction('idle')
       setView('style')
       setStylePhotoPreview(payload.previewUrl)
       setStylePhotoName(payload.photoName)
@@ -811,6 +869,8 @@ function App() {
       setHairPrompt('')
       setHairNote('')
       setHairCopyMessage('')
+      setHairAssetMessage('')
+      setHairAssetAction('idle')
       setView('hair')
       setHairPhotoPreview(payload.previewUrl)
       setHairPhotoName(payload.photoName)
@@ -999,6 +1059,160 @@ function App() {
 
   const copyHairPrompt = async () => {
     await copyText(hairPrompt, setHairCopyMessage, setHairCopyMessage)
+  }
+
+  const createReportFile = async (
+    element: HTMLElement | null,
+    fileName: string,
+  ) => {
+    if (!element) {
+      throw new Error(copy.reportImageExportError)
+    }
+
+    const blob = await toBlob(element, {
+      cacheBust: true,
+      pixelRatio: 2,
+    })
+
+    if (!blob) {
+      throw new Error(copy.reportImageExportError)
+    }
+
+    return new File([blob], fileName, { type: 'image/png' })
+  }
+
+  const downloadReportFile = (file: File) => {
+    const objectUrl = URL.createObjectURL(file)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = file.name
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => {
+      URL.revokeObjectURL(objectUrl)
+    }, 0)
+  }
+
+  const saveReportImage = async ({
+    captureRef,
+    fileName,
+    setAction,
+    setMessage,
+    setTone,
+  }: {
+    captureRef: React.RefObject<HTMLElement | null>
+    fileName: string
+    setAction: (action: 'idle' | 'save' | 'share') => void
+    setMessage: (message: string) => void
+    setTone: (tone: 'success' | 'error' | 'fallback') => void
+  }) => {
+    try {
+      setAction('save')
+      setMessage('')
+      const file = await createReportFile(captureRef.current, fileName)
+      downloadReportFile(file)
+      setTone('success')
+      setMessage(copy.reportImageSaveSuccess)
+    } catch (error) {
+      setTone('error')
+      setMessage(
+        error instanceof Error ? error.message : copy.reportImageExportError,
+      )
+    } finally {
+      setAction('idle')
+    }
+  }
+
+  const shareReportImage = async ({
+    captureRef,
+    fileName,
+    shareTitle,
+    setAction,
+    setMessage,
+    setTone,
+  }: {
+    captureRef: React.RefObject<HTMLElement | null>
+    fileName: string
+    shareTitle: string
+    setAction: (action: 'idle' | 'save' | 'share') => void
+    setMessage: (message: string) => void
+    setTone: (tone: 'success' | 'error' | 'fallback') => void
+  }) => {
+    try {
+      setAction('share')
+      setMessage('')
+      const file = await createReportFile(captureRef.current, fileName)
+
+      if (
+        typeof navigator.share !== 'function' ||
+        (typeof navigator.canShare === 'function' &&
+          !navigator.canShare({ files: [file] }))
+      ) {
+        throw new Error(copy.reportImageShareUnsupported)
+      }
+
+      await navigator.share({
+        files: [file],
+        title: shareTitle,
+        text: shareTitle,
+      })
+      setTone('success')
+      setMessage('')
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setMessage('')
+      } else {
+        setTone('error')
+        setMessage(
+          error instanceof Error ? error.message : copy.reportImageExportError,
+        )
+      }
+    } finally {
+      setAction('idle')
+    }
+  }
+
+  const saveStyleReportImage = async () => {
+    await saveReportImage({
+      captureRef: styleReportCaptureRef,
+      fileName: 'style-report.png',
+      setAction: setStyleAssetAction,
+      setMessage: setStyleAssetMessage,
+      setTone: setStyleAssetTone,
+    })
+  }
+
+  const shareStyleReportImage = async () => {
+    await shareReportImage({
+      captureRef: styleReportCaptureRef,
+      fileName: 'style-report.png',
+      shareTitle: copy.styleReportShareTitle,
+      setAction: setStyleAssetAction,
+      setMessage: setStyleAssetMessage,
+      setTone: setStyleAssetTone,
+    })
+  }
+
+  const saveHairReportImage = async () => {
+    await saveReportImage({
+      captureRef: hairReportCaptureRef,
+      fileName: 'hair-report.png',
+      setAction: setHairAssetAction,
+      setMessage: setHairAssetMessage,
+      setTone: setHairAssetTone,
+    })
+  }
+
+  const shareHairReportImage = async () => {
+    await shareReportImage({
+      captureRef: hairReportCaptureRef,
+      fileName: 'hair-report.png',
+      shareTitle: copy.hairReportShareTitle,
+      setAction: setHairAssetAction,
+      setMessage: setHairAssetMessage,
+      setTone: setHairAssetTone,
+    })
   }
 
   const beginProtectedEntry = async (targetView: ProtectedView) => {
@@ -1300,8 +1514,66 @@ function App() {
     </>
   )
 
+  const renderReportActions = ({
+    hasContent,
+    actionState,
+    message,
+    tone,
+    onSave,
+    onShare,
+  }: {
+    hasContent: boolean
+    actionState: 'idle' | 'save' | 'share'
+    message: string
+    tone: 'success' | 'error' | 'fallback'
+    onSave: () => Promise<void>
+    onShare: () => Promise<void>
+  }) => {
+    if (!hasContent) {
+      return null
+    }
+
+    return (
+      <section className="utility-card report-action-card">
+        <div className="report-action-group">
+          <button
+            className="utility-button report-action-button"
+            disabled={actionState !== 'idle'}
+            onClick={() => {
+              void onSave()
+            }}
+            type="button"
+          >
+            <DownloadIcon className="button-icon" />
+            <span>
+              {actionState === 'save'
+                ? copy.reportImageSaveLoading
+                : copy.reportImageSaveAction}
+            </span>
+          </button>
+          <button
+            className="utility-button report-action-button"
+            disabled={actionState !== 'idle'}
+            onClick={() => {
+              void onShare()
+            }}
+            type="button"
+          >
+            <ShareIcon className="button-icon" />
+            <span>
+              {actionState === 'share'
+                ? copy.reportImageShareLoading
+                : copy.reportImageShareAction}
+            </span>
+          </button>
+        </div>
+        {message ? <p className={`status-message ${tone}`}>{message}</p> : null}
+      </section>
+    )
+  }
+
   return (
-    <div className="app-frame">
+    <div className="app-frame" lang={language === 'ko' ? 'ko' : 'en'}>
       <div className="app-shell">
         <header className="topbar">
           {view === 'home' ? (
@@ -1534,7 +1806,7 @@ function App() {
                 </form>
               </section>
 
-              <section className="panel report-card">
+              <section className="panel report-card" ref={styleReportCaptureRef}>
                 <div className="report-card-header">
                   <span className="panel-tag">{copy.stylePanelTag}</span>
                   <h3>{copy.stylePanelTitle}</h3>
@@ -1567,6 +1839,15 @@ function App() {
                   <div className="empty-state">{copy.styleEmpty}</div>
                 )}
               </section>
+
+              {renderReportActions({
+                hasContent: Boolean(styleReport),
+                actionState: styleAssetAction,
+                message: styleAssetMessage,
+                tone: styleAssetTone,
+                onSave: saveStyleReportImage,
+                onShare: shareStyleReportImage,
+              })}
 
               {renderPromptUtility({
                 title: copy.stylePromptTitle,
@@ -1633,7 +1914,10 @@ function App() {
                 <form className="visually-hidden" id="hair-form-hidden" onSubmit={handleHairSubmit} />
               </section>
 
-              <section className="panel report-card hair-report-card">
+              <section
+                className="panel report-card hair-report-card"
+                ref={hairReportCaptureRef}
+              >
                 <div className="center-header">
                   <span className="panel-tag">{copy.hairPanelTag}</span>
                   <h3>{copy.hairPanelTitle}</h3>
@@ -1668,6 +1952,15 @@ function App() {
                   <div className="empty-state">{copy.hairEmpty}</div>
                 )}
               </section>
+
+              {renderReportActions({
+                hasContent: Boolean(hairResultImage || hairDescription),
+                actionState: hairAssetAction,
+                message: hairAssetMessage,
+                tone: hairAssetTone,
+                onSave: saveHairReportImage,
+                onShare: shareHairReportImage,
+              })}
 
               {renderPromptUtility({
                 title: copy.hairPromptTitle,
