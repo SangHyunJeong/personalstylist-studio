@@ -61,7 +61,7 @@ type PendingCheckoutPayload = StyleGenerationPayload | HairGenerationPayload
 
 type Theme = 'light' | 'dark'
 type Language = 'ko' | 'en'
-type View = 'home' | 'style' | 'hair'
+type View = 'home' | 'style' | 'hair' | 'billing'
 
 const homeStyleImage =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuDQjx-vParhC1dothBqJzuH356lz73-3ubERqUoT5vD7PVP-6JWbDUJOmUiF7xHQu1a3AvUMNrHW-RYaRmRSLlWsZejfRc9IkyHIB5x0r7TScYE-OT3lXUhRyl5r37cDOMlynoU9NXuA65unD52y31OY7Q-ni6AFAwrRSWbYU98PSLxaWZvysgx72USxcVwLNYX3C9CaPR5qmcmow2iAt1Eupi0iZPhBPUyf8z_xepgOug3zcHgSv_QMSD1qZRtUY9T5DSq1mVQrS0P'
@@ -111,7 +111,7 @@ const getInitialView = (): View => {
 
   const hash = window.location.hash.replace('#', '')
 
-  if (hash === 'style' || hash === 'hair') {
+  if (hash === 'style' || hash === 'hair' || hash === 'billing') {
     return hash
   }
 
@@ -185,16 +185,30 @@ const localeCopy = {
     hairPanelTitle: '3x3 헤어스타일 추천',
     hairEmpty:
       '사진을 업로드하면 3x3 헤어스타일 추천 이미지와 설명이 여기에 표시됩니다.',
+    checkoutFlowHint:
+      '지금 버튼을 누르면 Polar 결제로 이동한 뒤, 결제가 확인되면 입력한 내용으로 생성이 자동 이어집니다.',
     hairPromptTitle: '생성형 AI 프롬프트',
     hairPromptDescription:
       'ChatGPT, Gemini 또는 다른 이미지 생성 도구에서 다시 시도할 수 있도록 프롬프트를 복사합니다.',
     utilityButton: '내 생성형 AI로 가져가서 이미지 생성할 프롬프트 복사하기',
     recommendedVisual: '추천 스타일 비주얼',
+    topbarBilling: '결제 및 액세스',
     checkoutTitle: '디지털 액세스 구매',
     checkoutDescription:
       'Polar 결제로 이 AI 스타일링 소프트웨어의 디지털 액세스를 구매합니다. 오프라인 서비스나 실물 상품은 포함되지 않습니다.',
     checkoutButton: 'Polar로 결제하기',
     checkoutLoading: '결제 페이지 준비 중...',
+    checkoutStatusLabel: '현재 액세스 상태',
+    checkoutLockedTitle: '아직 결제가 확인되지 않았습니다',
+    checkoutLockedBody:
+      '체형 스타일 보고서와 헤어스타일링 추천은 결제 완료 후 자동으로 이어서 생성됩니다.',
+    checkoutVerifiedStatus: '이 기기에서는 결제 확인이 완료되어 두 생성 흐름을 바로 사용할 수 있습니다.',
+    checkoutPendingStatus:
+      '결제 세션이 대기 중입니다. 결제를 마친 뒤 이 페이지로 돌아오면 상태가 갱신됩니다.',
+    checkoutPageTag: 'BILLING',
+    checkoutPageTitle: '결제 후 자동으로 생성이 이어집니다',
+    checkoutPageBody:
+      '사진과 정보를 먼저 입력한 뒤 생성 버튼을 누르면 Polar checkout으로 이동합니다. 결제가 확인되면 방금 입력한 내용으로 스타일 결과를 자동 생성합니다.',
     checkoutError: '결제 페이지를 시작하지 못했습니다.',
     checkoutVerifiedTitle: '결제 확인 완료',
     checkoutVerifiedBody:
@@ -205,7 +219,7 @@ const localeCopy = {
     navHome: 'HOME',
     navStylist: 'STYLIST',
     navGallery: 'REPORTS',
-    navProfile: 'PROFILE',
+    navProfile: 'BILLING',
   },
   en: {
     languageLabel: 'Language',
@@ -273,16 +287,31 @@ const localeCopy = {
     hairPanelTitle: '3x3 Hairstyle Recommendations',
     hairEmpty:
       'Upload your photo to see the 3x3 hairstyle grid and recommendation details here.',
+    checkoutFlowHint:
+      'When you submit, Polar checkout opens first. After payment is verified, generation resumes automatically with the same inputs.',
     hairPromptTitle: 'Generative Prompt',
     hairPromptDescription:
       'Copy an optimized prompt to try the hairstyle generation again in ChatGPT, Gemini, or another image tool.',
     utilityButton: 'Copy prompt for image generation in my AI',
     recommendedVisual: 'Recommended Style Visual',
+    topbarBilling: 'Billing & Access',
     checkoutTitle: 'Purchase Digital Access',
     checkoutDescription:
       'Use Polar checkout to purchase digital access to this AI styling software. No offline service or physical goods are included.',
     checkoutButton: 'Pay with Polar',
     checkoutLoading: 'Preparing checkout...',
+    checkoutStatusLabel: 'Current access status',
+    checkoutLockedTitle: 'Payment has not been verified yet',
+    checkoutLockedBody:
+      'Both the body style report and hairstyling generation continue automatically after checkout succeeds.',
+    checkoutVerifiedStatus:
+      'Payment is already verified on this device, so both generation flows can start immediately.',
+    checkoutPendingStatus:
+      'A checkout session is still pending. Return here after payment and the status will refresh.',
+    checkoutPageTag: 'BILLING',
+    checkoutPageTitle: 'Pay once, then continue automatically',
+    checkoutPageBody:
+      'Users can fill in their photo and details first, then tap generate to open Polar checkout. After payment is verified, the app resumes the requested style generation automatically.',
     checkoutError: 'Unable to start the checkout flow.',
     checkoutVerifiedTitle: 'Payment verified',
     checkoutVerifiedBody:
@@ -293,7 +322,7 @@ const localeCopy = {
     navHome: 'HOME',
     navStylist: 'STYLIST',
     navGallery: 'REPORTS',
-    navProfile: 'PROFILE',
+    navProfile: 'BILLING',
   },
 } as const
 
@@ -1072,7 +1101,9 @@ function App() {
     ? 'gallery'
     : view === 'hair'
       ? 'stylist'
-      : 'home'
+      : view === 'billing'
+        ? 'profile'
+        : 'home'
 
   const renderPhotoField = ({
     label,
@@ -1197,6 +1228,59 @@ function App() {
     )
   }
 
+  const renderBillingPage = () => (
+    <>
+      <section className="panel report-card">
+        <div className="report-card-header">
+          <span className="panel-tag">{copy.checkoutPageTag}</span>
+          <h3>{copy.checkoutPageTitle}</h3>
+        </div>
+        <div className="rich-content">
+          <p className="rich-paragraph">{copy.checkoutPageBody}</p>
+          <div className="billing-status-card">
+            <strong>{copy.checkoutStatusLabel}</strong>
+            <p className="rich-paragraph">
+              {isPurchaseVerified
+                ? copy.checkoutVerifiedStatus
+                : checkoutStatus === 'pending'
+                  ? copy.checkoutPendingStatus
+                  : copy.checkoutLockedBody}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="utility-card checkout-card">
+        <div className="utility-copy">
+          <div className="utility-icon">
+            <SparkleIcon className="utility-icon-svg" />
+          </div>
+          <div>
+            <h4>
+              {isPurchaseVerified
+                ? copy.checkoutVerifiedTitle
+                : copy.checkoutLockedTitle}
+            </h4>
+            <p>{copy.checkoutDescription}</p>
+          </div>
+        </div>
+        <button
+          className="utility-button checkout-button"
+          disabled={isCheckoutLoading}
+          onClick={() => {
+            void startCheckout()
+          }}
+          type="button"
+        >
+          <SparkleIcon className="button-icon" />
+          <span>
+            {isCheckoutLoading ? copy.checkoutLoading : copy.checkoutButton}
+          </span>
+        </button>
+      </section>
+    </>
+  )
+
   return (
     <div className="app-frame">
       <div className="app-shell">
@@ -1235,7 +1319,11 @@ function App() {
               </button>
 
               <h1 className="topbar-title">
-                {view === 'style' ? copy.topbarStyle : copy.topbarHair}
+                {view === 'style'
+                  ? copy.topbarStyle
+                  : view === 'hair'
+                    ? copy.topbarHair
+                    : copy.topbarBilling}
               </h1>
 
               <button
@@ -1403,6 +1491,10 @@ function App() {
                     <p className="status-message error">{styleErrorMessage}</p>
                   ) : null}
 
+                  {!isPurchaseVerified ? (
+                    <p className="status-message fallback">{copy.checkoutFlowHint}</p>
+                  ) : null}
+
                   <button
                     className="action-button"
                     disabled={isStyleLoading || isCheckoutLoading}
@@ -1497,6 +1589,10 @@ function App() {
                   <p className="status-message error">{hairErrorMessage}</p>
                 ) : null}
 
+                {!isPurchaseVerified ? (
+                  <p className="status-message fallback">{copy.checkoutFlowHint}</p>
+                ) : null}
+
                 <button
                   className="action-button"
                   disabled={isHairLoading || isCheckoutLoading}
@@ -1560,13 +1656,14 @@ function App() {
               })}
             </>
           ) : null}
+
+          {view === 'billing' ? renderBillingPage() : null}
         </main>
 
         <nav className="bottom-nav">
           {navItems.map((item) => {
             const IconComponent = item.icon
             const isActive = activeNav === item.key
-            const isClickable = item.key === 'home' || item.key === 'stylist' || item.key === 'gallery'
 
             const handleClick = () => {
               if (item.key === 'home') {
@@ -1580,12 +1677,15 @@ function App() {
               if (item.key === 'gallery') {
                 setView('style')
               }
+
+              if (item.key === 'profile') {
+                setView('billing')
+              }
             }
 
             return (
               <button
                 className={`nav-item ${isActive ? 'is-active' : ''}`}
-                disabled={!isClickable}
                 key={item.key}
                 onClick={handleClick}
                 type="button"

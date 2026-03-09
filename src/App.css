@@ -644,6 +644,22 @@
   border-style: solid;
 }
 
+.billing-status-card {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+}
+
+.billing-status-card strong {
+  color: var(--text-strong);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .checkout-button {
   background: var(--accent-primary);
   color: #fff;
