@@ -226,11 +226,13 @@ const generateText = async ({
   prompt,
   imageBase64,
   mimeType,
+  preferredLocale,
 }: {
   env: Env
   prompt: string
   imageBase64?: string
   mimeType?: string
+  preferredLocale?: string
 }): Promise<TextGenerationResult> => {
   const parts: Array<Record<string, unknown>> = [{ text: prompt }]
 
@@ -326,6 +328,7 @@ export async function onRequestPost(context: PagesContext) {
       env,
       imageBase64,
       mimeType,
+      preferredLocale,
     })
 
     let report = initialResult.text
@@ -342,6 +345,7 @@ export async function onRequestPost(context: PagesContext) {
       const continuationResult = await generateText({
         prompt: continuationPrompt,
         env,
+        preferredLocale,
       })
 
       if (continuationResult.text) {

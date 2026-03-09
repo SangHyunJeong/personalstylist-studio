@@ -50,6 +50,9 @@ const jsonResponse = (
 const isKoreanLocale = (preferredLocale?: string) =>
   preferredLocale?.toLowerCase().startsWith('ko') ?? false
 
+const isLocationRestrictedError = (message?: string) =>
+  message?.toLowerCase().includes('user location is not supported') ?? false
+
 const getBaseApiUrl = (server?: string) =>
   server === 'sandbox'
     ? 'https://sandbox-api.polar.sh'
@@ -222,6 +225,41 @@ const buildGenericHairFallbackPromptRequest = (preferredLocale?: string) =>
     `User locale: ${preferredLocale || 'en-US'}`,
   ].join('\n')
 
+const buildOfflineHairFallbackDescription = (preferredLocale?: string) =>
+  isKoreanLocale(preferredLocale)
+    ? [
+        '**Recommendation Summary**',
+        '현재 이미지 생성 API의 지역 제한 때문에 서버에서 직접 3x3 이미지를 만들 수 없어, 외부 생성형 AI에서 바로 사용할 수 있는 헤어스타일링 프롬프트를 준비했습니다.',
+        '아래 프롬프트를 ChatGPT, Gemini, Nano Banana 같은 도구에 붙여 넣으면 같은 얼굴을 유지한 3x3 헤어스타일 시안을 다시 시도할 수 있습니다.',
+        '',
+        '**Nine Style Notes**',
+        '1. 자연스러운 가르마의 미디엄 레이어 컷',
+        '2. 부드러운 볼륨의 시스루 뱅 스타일',
+        '3. 깔끔한 다운펌 느낌의 클래식 숏컷',
+        '4. 텍스처가 강조된 소프트 리프컷',
+        '5. 얼굴선을 살리는 내추럴 웨이브 보브',
+        '6. 정돈된 사이드 파트의 스마트 캐주얼 컷',
+        '7. 볼륨을 살린 허쉬 레이어 또는 울프 무드 컷',
+        '8. 차분한 컬감의 세미 웨이브 스타일',
+        '9. 일상용으로 무난한 로우 메인터넌스 컷',
+      ].join('\n')
+    : [
+        '**Recommendation Summary**',
+        'The image generation API is currently restricted for this location, so the app prepared a portable hairstyle prompt instead of a direct 3x3 render.',
+        'You can paste the prompt into ChatGPT, Gemini, Nano Banana, or another image tool to retry a 3x3 hairstyle board while keeping the same face.',
+        '',
+        '**Nine Style Notes**',
+        '1. Medium layered cut with a natural side part',
+        '2. Soft see-through fringe with balanced volume',
+        '3. Clean classic short cut with a polished silhouette',
+        '4. Textured soft leaf cut',
+        '5. Natural wave bob that frames the face',
+        '6. Smart casual side-part cut',
+        '7. Volume-focused hush layer or soft wolf mood cut',
+        '8. Semi-wave style with calm texture',
+        '9. Low-maintenance everyday cut',
+      ].join('\n')
+
 export async function onRequestPost(context: PagesContext) {
   const { request, env } = context
   let preferredLocale: string | undefined
@@ -321,7 +359,7 @@ export async function onRequestPost(context: PagesContext) {
           : 'An error occurred while calling Gemini image generation.'
       )
 
-      if (response.status === 429) {
+      if (response.status === 429 || isLocationRestrictedError(lastImageErrorMessage)) {
         shouldFallbackToPrompt = true
         break
       }
@@ -392,6 +430,22 @@ export async function onRequestPost(context: PagesContext) {
             : 'Image generation was switched to a text prompt recommendation because of a limit or image processing issue.',
         })
       }
+    }
+
+    if (shouldFallbackToPrompt || isLocationRestrictedError(lastImageErrorMessage)) {
+      const description = buildOfflineHairFallbackDescription(preferredLocale)
+
+      return Response.json({
+        mode: 'prompt',
+        description,
+        prompt: buildHairExternalPrompt({
+          preferredLocale,
+          styleSummary: description,
+        }),
+        note: isKoreanLocale(preferredLocale)
+          ? '현재 지역에서는 Gemini 이미지 생성 API가 제한되어 있어, 외부 생성형 AI용 프롬프트로 전환했습니다.'
+          : 'Gemini image generation is restricted for this location, so the result was switched to an external-AI prompt.',
+      })
     }
 
     throw new Error(
