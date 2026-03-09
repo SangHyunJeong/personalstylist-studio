@@ -15,7 +15,7 @@ type PolarCheckoutResponse = {
   }
 }
 
-const PRODUCT_ID = '002b35bb-9e2b-450c-9127-6a4175c61347'
+const PRODUCT_ID = '82fb5b93-ef0a-4af0-914c-05aaf8882da2'
 
 const jsonResponse = (
   body: Record<string, string>,
