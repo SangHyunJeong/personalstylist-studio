@@ -120,6 +120,14 @@ const getInitialView = (): View => {
   return 'home'
 }
 
+const getInitialPurchaseVerified = (): boolean => {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  return window.localStorage.getItem(PURCHASE_VERIFIED_KEY) === 'true'
+}
+
 const localeCopy = {
   ko: {
     languageLabel: 'Language',
@@ -408,7 +416,7 @@ const ScissorsIcon = ({ className = '' }: { className?: string }) => (
     <circle cx="6.5" cy="16.75" r="2.25" stroke="currentColor" strokeWidth="1.7" />
     <circle cx="6.5" cy="7.25" r="2.25" stroke="currentColor" strokeWidth="1.7" />
     <path
-      d="M19.5 5.5 8.6 11.3M19.5 18.5 8.6 12.7M11.4 12l8.1 0"
+      d="M19 5.75 9.2 10.95M19 18.25 9.2 13.05M8.25 9.85l2.85 2.15M8.25 14.15 11.1 12"
       stroke="currentColor"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -543,7 +551,7 @@ function App() {
   const [checkoutErrorMessage, setCheckoutErrorMessage] = useState('')
   const [checkoutStatus, setCheckoutStatus] = useState<'idle' | 'pending' | 'verified'>('idle')
   const [checkoutStatusMessage, setCheckoutStatusMessage] = useState('')
-  const [isPurchaseVerified, setIsPurchaseVerified] = useState(false)
+  const [isPurchaseVerified, setIsPurchaseVerified] = useState(getInitialPurchaseVerified)
   const copy = localeCopy[language]
   const preferredLocale = language === 'ko' ? 'ko-KR' : 'en-US'
 
@@ -555,12 +563,6 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem('language', language)
   }, [language])
-
-  useEffect(() => {
-    setIsPurchaseVerified(
-      window.localStorage.getItem(PURCHASE_VERIFIED_KEY) === 'true',
-    )
-  }, [])
 
   useEffect(() => {
     const handleHashChange = () => {
