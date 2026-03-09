@@ -251,8 +251,7 @@ const localeCopy = {
     navBilling: 'BILLING',
     legalTag: 'LEGAL',
     legalLinksTitle: '약관 및 정책',
-    legalLinksDescription:
-      '이 디지털 AI 스타일링 서비스의 약관, 환불 규정, 개인정보 처리방침을 확인할 수 있습니다.',
+    legalLinksDescription: '서비스 약관, 환불 규정, 개인정보 처리방침',
   },
   en: {
     languageLabel: 'Language',
@@ -368,8 +367,7 @@ const localeCopy = {
     navBilling: 'BILLING',
     legalTag: 'LEGAL',
     legalLinksTitle: 'Terms and policies',
-    legalLinksDescription:
-      'Review the terms, refund policy, and privacy policy for this digital AI styling product.',
+    legalLinksDescription: 'Terms of Service, Refund Policy, Privacy Policy',
   },
 } as const
 
@@ -1571,16 +1569,11 @@ function App() {
   }
 
   const renderPolicyLinks = () => (
-    <section className="utility-card policy-links-card">
-      <div className="utility-copy">
-        <div className="utility-icon">
-          <SparkleIcon className="utility-icon-svg" />
-        </div>
-        <div>
-          <h4>{copy.legalLinksTitle}</h4>
-          <p>{copy.legalLinksDescription}</p>
-        </div>
-      </div>
+    <section className="policy-links-card">
+      <p className="policy-links-label">
+        <strong>{copy.legalLinksTitle}</strong>
+        <span>{copy.legalLinksDescription}</span>
+      </p>
       <div className="policy-link-grid">
         {policyViews.map((policyView) => {
           const policy = policyCopy[policyView]

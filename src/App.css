@@ -710,31 +710,47 @@
 }
 
 .policy-links-card {
-  gap: 0.9rem;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.2rem 0.1rem 0;
+}
+
+.policy-links-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.policy-links-label strong {
+  color: var(--text-strong);
 }
 
 .policy-link-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.55rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
 }
 
 .policy-link-button {
-  min-height: 3rem;
-  padding: 0.75rem 0.9rem;
-  border-radius: 1rem;
+  min-height: 2.2rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
   border: 1px solid var(--field-border);
   background: var(--field-bg);
-  color: var(--text-strong);
-  font-size: 0.86rem;
+  color: var(--text-muted);
+  font-size: 0.76rem;
   font-weight: 800;
-  line-height: 1.35;
+  line-height: 1.2;
   text-align: center;
 }
 
 .policy-link-button.is-active {
-  border-color: rgba(255, 17, 95, 0.36);
-  background: rgba(255, 17, 95, 0.12);
+  border-color: rgba(255, 17, 95, 0.32);
+  background: rgba(255, 17, 95, 0.1);
   color: var(--accent-primary);
 }
 
@@ -866,6 +882,7 @@
   .status-message,
   .empty-state,
   .visual-caption,
+  .policy-links-label,
   .policy-subtitle,
   .policy-meta,
   .policy-section h4,
@@ -891,6 +908,7 @@
   .utility-copy p,
   .status-message,
   .empty-state,
+  .policy-links-label,
   .policy-subtitle
 ) {
   text-wrap: pretty;
@@ -950,6 +968,7 @@
   }
 
   .policy-link-grid {
+    display: grid;
     grid-template-columns: 1fr;
   }
 }
