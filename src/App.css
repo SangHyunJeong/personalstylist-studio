@@ -1,8 +1,8 @@
 .app-shell {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   gap: 2rem;
-  align-items: stretch;
+  align-items: start;
   min-height: 100vh;
   padding: 2rem;
 }
@@ -10,11 +10,12 @@
 .hero-panel,
 .form-panel {
   position: relative;
-  overflow: hidden;
   border-radius: 32px;
 }
 
 .hero-panel {
+  position: sticky;
+  top: 2rem;
   padding: 3.5rem;
   background:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.24), transparent 32%),
@@ -30,17 +31,18 @@
 }
 
 .hero-panel h1 {
-  max-width: none;
+  max-width: 12ch;
   margin: 0;
-  font-size: clamp(2.35rem, 4.6vw, 5rem);
-  line-height: 0.94;
+  font-size: clamp(2.7rem, 5vw, 4.8rem);
+  line-height: 1;
   letter-spacing: -0.05em;
   word-break: keep-all;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .hero-copy {
-  max-width: 34rem;
+  max-width: 30rem;
   margin: 1.5rem 0 0;
   font-size: 1.05rem;
   line-height: 1.7;
@@ -306,6 +308,8 @@
   }
 
   .hero-panel {
+    position: relative;
+    top: auto;
     padding: 2rem;
   }
 }
@@ -314,7 +318,6 @@
   .hero-panel h1 {
     max-width: 100%;
     font-size: 2.8rem;
-    white-space: normal;
   }
 
   .metrics-grid {
