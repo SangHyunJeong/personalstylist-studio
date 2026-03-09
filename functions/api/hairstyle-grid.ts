@@ -37,7 +37,7 @@ const IMAGE_MODELS = [
   'gemini-3.1-flash-image-preview',
 ]
 
-const TEXT_FALLBACK_MODEL = 'gemini-2.5-flash'
+const TEXT_FALLBACK_MODEL = 'gemini-3-flash-preview'
 
 const jsonResponse = (
   body: Record<string, string>,
