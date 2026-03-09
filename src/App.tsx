@@ -1532,6 +1532,8 @@ function App() {
           </button>
         )}
       </section>
+
+      {renderPolicyLinks()}
     </>
   )
 
@@ -2057,7 +2059,6 @@ function App() {
 
           {view === 'billing' ? renderBillingPage() : null}
           {isPolicyView(view) ? renderPolicyPage(view) : null}
-          {renderPolicyLinks()}
         </main>
 
         <nav className="bottom-nav">
