@@ -666,6 +666,78 @@
   border-style: solid;
 }
 
+.policy-card {
+  gap: 1rem;
+}
+
+.policy-subtitle,
+.policy-meta {
+  margin: 0;
+  line-height: 1.65;
+}
+
+.policy-subtitle {
+  color: var(--text-body);
+}
+
+.policy-meta {
+  font-size: 0.86rem;
+  color: var(--text-muted);
+}
+
+.policy-section-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.policy-section {
+  display: grid;
+  gap: 0.7rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--divider-color);
+}
+
+.policy-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.policy-section h4 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--text-strong);
+}
+
+.policy-links-card {
+  gap: 0.9rem;
+}
+
+.policy-link-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.policy-link-button {
+  min-height: 3rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 1rem;
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--text-strong);
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.policy-link-button.is-active {
+  border-color: rgba(255, 17, 95, 0.36);
+  background: rgba(255, 17, 95, 0.12);
+  color: var(--accent-primary);
+}
+
 .billing-status-card {
   display: grid;
   gap: 0.45rem;
@@ -794,8 +866,12 @@
   .status-message,
   .empty-state,
   .visual-caption,
+  .policy-subtitle,
+  .policy-meta,
+  .policy-section h4,
   .action-button,
   .utility-button,
+  .policy-link-button,
   .primary-cta,
   .secondary-cta
 ) {
@@ -814,7 +890,8 @@
   .rich-list-item p,
   .utility-copy p,
   .status-message,
-  .empty-state
+  .empty-state,
+  .policy-subtitle
 ) {
   text-wrap: pretty;
 }
@@ -869,6 +946,10 @@
   }
 
   .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .policy-link-grid {
     grid-template-columns: 1fr;
   }
 }

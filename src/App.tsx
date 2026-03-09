@@ -7,6 +7,7 @@ import type {
   ReactNode,
 } from 'react'
 import { toBlob } from 'html-to-image'
+import { policyDocuments, type PolicyView as LegalView } from './legalContent'
 import './App.css'
 
 type StyleReportResponse = {
@@ -63,7 +64,7 @@ type ProtectedView = Extract<View, 'style' | 'hair'>
 
 type Theme = 'light' | 'dark'
 type Language = 'ko' | 'en'
-type View = 'home' | 'style' | 'hair' | 'billing'
+type View = 'home' | 'style' | 'hair' | 'billing' | LegalView
 
 const homeStyleImage =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuDQjx-vParhC1dothBqJzuH356lz73-3ubERqUoT5vD7PVP-6JWbDUJOmUiF7xHQu1a3AvUMNrHW-RYaRmRSLlWsZejfRc9IkyHIB5x0r7TScYE-OT3lXUhRyl5r37cDOMlynoU9NXuA65unD52y31OY7Q-ni6AFAwrRSWbYU98PSLxaWZvysgx72USxcVwLNYX3C9CaPR5qmcmow2iAt1Eupi0iZPhBPUyf8z_xepgOug3zcHgSv_QMSD1qZRtUY9T5DSq1mVQrS0P'
@@ -114,7 +115,14 @@ const getInitialView = (): View => {
 
   const hash = window.location.hash.replace('#', '')
 
-  if (hash === 'style' || hash === 'hair' || hash === 'billing') {
+  if (
+    hash === 'style' ||
+    hash === 'hair' ||
+    hash === 'billing' ||
+    hash === 'terms' ||
+    hash === 'refunds' ||
+    hash === 'privacy'
+  ) {
     return hash
   }
 
@@ -233,7 +241,7 @@ const localeCopy = {
     checkoutError: '결제 페이지를 시작하지 못했습니다.',
     checkoutVerifiedTitle: '결제 확인 완료',
     checkoutVerifiedBody:
-      'Polar 샌드박스 결제가 성공으로 확인되었습니다. 현재 checkout 세션 상태는 검증된 상태입니다.',
+      'Polar 결제가 확인되었습니다. 이 기기에서는 구매된 디지털 액세스를 사용할 수 있습니다.',
     checkoutPendingTitle: '결제 확인 대기 중',
     checkoutPendingBody:
       '결제 후 돌아왔지만 Polar에서 아직 성공 상태가 확정되지 않았습니다. 잠시 후 다시 새로고침해 보세요.',
@@ -241,6 +249,10 @@ const localeCopy = {
     navStyle: 'STYLE',
     navHair: 'HAIR',
     navBilling: 'BILLING',
+    legalTag: 'LEGAL',
+    legalLinksTitle: '약관 및 정책',
+    legalLinksDescription:
+      '이 디지털 AI 스타일링 서비스의 약관, 환불 규정, 개인정보 처리방침을 확인할 수 있습니다.',
   },
   en: {
     languageLabel: 'Language',
@@ -346,7 +358,7 @@ const localeCopy = {
     checkoutError: 'Unable to start the checkout flow.',
     checkoutVerifiedTitle: 'Payment verified',
     checkoutVerifiedBody:
-      'Your Polar sandbox payment was verified successfully. The current checkout session has been confirmed.',
+      'Your Polar payment has been verified. Digital access is available on this device.',
     checkoutPendingTitle: 'Payment still pending',
     checkoutPendingBody:
       'You returned from checkout, but Polar has not marked this session as succeeded yet. Please refresh in a moment.',
@@ -354,6 +366,10 @@ const localeCopy = {
     navStyle: 'STYLE',
     navHair: 'HAIR',
     navBilling: 'BILLING',
+    legalTag: 'LEGAL',
+    legalLinksTitle: 'Terms and policies',
+    legalLinksDescription:
+      'Review the terms, refund policy, and privacy policy for this digital AI styling product.',
   },
 } as const
 
@@ -564,6 +580,11 @@ const navItems = [
   { key: 'billing', icon: PersonIcon },
 ] as const
 
+const policyViews: LegalView[] = ['terms', 'refunds', 'privacy']
+
+const isPolicyView = (view: View): view is LegalView =>
+  view === 'terms' || view === 'refunds' || view === 'privacy'
+
 function App() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const [language, setLanguage] = useState<Language>(getInitialLanguage)
@@ -608,6 +629,7 @@ function App() {
   const [checkoutStatusMessage, setCheckoutStatusMessage] = useState('')
   const [isPurchaseVerified, setIsPurchaseVerified] = useState(getInitialPurchaseVerified)
   const copy = localeCopy[language]
+  const policyCopy = policyDocuments[language]
   const preferredLocale = language === 'ko' ? 'ko-KR' : 'en-US'
 
   useEffect(() => {
@@ -1332,7 +1354,8 @@ function App() {
     }
   }, [copy.checkoutError, copy.checkoutPendingBody, copy.checkoutVerifiedBody, preferredLocale])
 
-  const activeNav = view
+  const activeNav = isPolicyView(view) ? 'billing' : view
+  const currentPolicy = isPolicyView(view) ? policyCopy[view] : null
 
   const renderPhotoField = ({
     label,
@@ -1514,6 +1537,71 @@ function App() {
     </>
   )
 
+  const renderPolicyPage = (policyView: LegalView) => {
+    const policy = policyCopy[policyView]
+
+    return (
+      <section className="panel report-card policy-card">
+        <div className="report-card-header">
+          <span className="panel-tag">{copy.legalTag}</span>
+          <h3>{policy.title}</h3>
+        </div>
+        <p className="policy-subtitle">{policy.subtitle}</p>
+        <p className="policy-meta">{policy.lastUpdated}</p>
+        <div className="policy-section-stack">
+          {policy.sections.map((section) => (
+            <section className="policy-section" key={section.heading}>
+              <h4>{section.heading}</h4>
+              {section.paragraphs.map((paragraph, index) => (
+                <p className="rich-paragraph" key={`${section.heading}-p-${index}`}>
+                  {paragraph}
+                </p>
+              ))}
+              {section.bullets?.map((bullet, index) => (
+                <div className="rich-list-item" key={`${section.heading}-b-${index}`}>
+                  <CheckIcon className="rich-list-icon" />
+                  <p>{bullet}</p>
+                </div>
+              ))}
+            </section>
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  const renderPolicyLinks = () => (
+    <section className="utility-card policy-links-card">
+      <div className="utility-copy">
+        <div className="utility-icon">
+          <SparkleIcon className="utility-icon-svg" />
+        </div>
+        <div>
+          <h4>{copy.legalLinksTitle}</h4>
+          <p>{copy.legalLinksDescription}</p>
+        </div>
+      </div>
+      <div className="policy-link-grid">
+        {policyViews.map((policyView) => {
+          const policy = policyCopy[policyView]
+          const isActive = view === policyView
+
+          return (
+            <button
+              aria-current={isActive ? 'page' : undefined}
+              className={`policy-link-button ${isActive ? 'is-active' : ''}`}
+              key={policyView}
+              onClick={() => setView(policyView)}
+              type="button"
+            >
+              {policy.title}
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+
   const renderReportActions = ({
     hasContent,
     actionState,
@@ -1610,11 +1698,12 @@ function App() {
               </button>
 
               <h1 className="topbar-title">
-                {view === 'style'
-                  ? copy.topbarStyle
-                  : view === 'hair'
-                    ? copy.topbarHair
-                    : copy.topbarBilling}
+                {currentPolicy?.title ??
+                  (view === 'style'
+                    ? copy.topbarStyle
+                    : view === 'hair'
+                      ? copy.topbarHair
+                      : copy.topbarBilling)}
               </h1>
 
               <button
@@ -1974,6 +2063,8 @@ function App() {
           ) : null}
 
           {view === 'billing' ? renderBillingPage() : null}
+          {isPolicyView(view) ? renderPolicyPage(view) : null}
+          {renderPolicyLinks()}
         </main>
 
         <nav className="bottom-nav">
