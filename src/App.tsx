@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import type {
   CSSProperties,
   ChangeEvent,
@@ -39,6 +39,26 @@ type CheckoutStatusResponse = {
   error?: string
 }
 
+type StyleGenerationPayload = {
+  kind: 'style'
+  imageBase64: string
+  mimeType: string
+  previewUrl: string
+  photoName: string
+  height: string
+  weight: string
+}
+
+type HairGenerationPayload = {
+  kind: 'hair'
+  imageBase64: string
+  mimeType: string
+  previewUrl: string
+  photoName: string
+}
+
+type PendingCheckoutPayload = StyleGenerationPayload | HairGenerationPayload
+
 type Theme = 'light' | 'dark'
 type Language = 'ko' | 'en'
 type View = 'home' | 'style' | 'hair'
@@ -48,6 +68,9 @@ const homeStyleImage =
 
 const homeHairImage =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuCiSoCbdZuRJXGn4Kar-8Sh8WklP3L-cazvB65L2O-j9SDHoSd2DGfiznQyEpdI_JEZEkTKsoK9tkDC_HwU03HvOSayIiYsiUnoZLr9bbYrj-SDFS-3Yi5Ta8VVZCQB0B2ZgNvncqijcLi6l2T22UzdyOUKEdlD4ZACHKAIRA2AVFUpLVuPWL1RrR0hqAK8bGBc-U6yjKz5NihvIWvV4WuqWfYspWoWrYPUkhuUzxf_UMnLMJA2-NFcnaxo7EKcfJOnOjTNIvVIMg5I'
+
+const PURCHASE_VERIFIED_KEY = 'polar_purchase_verified'
+const PENDING_CHECKOUT_KEY = 'polar_pending_checkout_payload'
 
 const getInitialTheme = (): Theme => {
   if (typeof window === 'undefined') {
@@ -141,6 +164,8 @@ const localeCopy = {
     styleWeightPlaceholder: '예: 70',
     styleAction: '분석 생성하기',
     styleActionLoading: '스타일 보고서 생성 중...',
+    stylePayAction: '결제 후 분석 시작하기',
+    stylePayActionLoading: '결제 페이지 준비 중...',
     stylePanelTag: 'AI 스타일 보고서',
     stylePanelTitle: 'AI 자동 스타일 보고서',
     styleEmpty:
@@ -154,6 +179,8 @@ const localeCopy = {
       '드래그 앤 드롭하거나 탭해서 선명한 인물 사진을 업로드하세요.',
     hairAction: '내 스타일 분석하기',
     hairActionLoading: '헤어스타일 추천 생성 중...',
+    hairPayAction: '결제 후 헤어 추천받기',
+    hairPayActionLoading: '결제 페이지 준비 중...',
     hairPanelTag: 'AI 헤어 스타일리스트',
     hairPanelTitle: '3x3 헤어스타일 추천',
     hairEmpty:
@@ -225,6 +252,8 @@ const localeCopy = {
     styleWeightPlaceholder: 'e.g. 70',
     styleAction: 'Generate Analysis',
     styleActionLoading: 'Generating Analysis...',
+    stylePayAction: 'Pay and Generate',
+    stylePayActionLoading: 'Preparing checkout...',
     stylePanelTag: 'AI Style Report',
     stylePanelTitle: 'AI Automated Style Report',
     styleEmpty:
@@ -238,6 +267,8 @@ const localeCopy = {
       'Drag and drop or tap to upload a clear portrait for AI hair analysis.',
     hairAction: 'Analyze My Look',
     hairActionLoading: 'Analyzing My Look...',
+    hairPayAction: 'Pay and Analyze',
+    hairPayActionLoading: 'Preparing checkout...',
     hairPanelTag: 'AI Hair Stylist',
     hairPanelTitle: '3x3 Hairstyle Recommendations',
     hairEmpty:
@@ -502,6 +533,7 @@ function App() {
   const [checkoutErrorMessage, setCheckoutErrorMessage] = useState('')
   const [checkoutStatus, setCheckoutStatus] = useState<'idle' | 'pending' | 'verified'>('idle')
   const [checkoutStatusMessage, setCheckoutStatusMessage] = useState('')
+  const [isPurchaseVerified, setIsPurchaseVerified] = useState(false)
   const copy = localeCopy[language]
   const preferredLocale = language === 'ko' ? 'ko-KR' : 'en-US'
 
@@ -513,6 +545,12 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem('language', language)
   }, [language])
+
+  useEffect(() => {
+    setIsPurchaseVerified(
+      window.localStorage.getItem(PURCHASE_VERIFIED_KEY) === 'true',
+    )
+  }, [])
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -558,63 +596,6 @@ function App() {
     }
   }, [copy.noImageSelected, hairPhotoFile, stylePhotoFile])
 
-  useEffect(() => {
-    const url = new URL(window.location.href)
-    const checkoutFlag = url.searchParams.get('checkout')
-    const checkoutId = url.searchParams.get('checkout_id')
-
-    if (checkoutFlag !== 'success' || !checkoutId) {
-      return
-    }
-
-    let isCancelled = false
-
-    const verifyCheckout = async () => {
-      try {
-        const response = await fetch(
-          `/api/checkout-status?checkout_id=${encodeURIComponent(checkoutId)}&preferred_locale=${encodeURIComponent(preferredLocale)}`,
-        )
-        const rawText = await response.text()
-        const data = rawText.trim()
-          ? (JSON.parse(rawText) as CheckoutStatusResponse)
-          : null
-
-        if (!response.ok || !data?.status) {
-          throw new Error(data?.error ?? copy.checkoutError)
-        }
-
-        if (isCancelled) {
-          return
-        }
-
-        if (data.status === 'succeeded') {
-          setCheckoutStatus('verified')
-          setCheckoutStatusMessage(copy.checkoutVerifiedBody)
-          window.localStorage.setItem('polar_purchase_verified', 'true')
-          return
-        }
-
-        setCheckoutStatus('pending')
-        setCheckoutStatusMessage(copy.checkoutPendingBody)
-      } catch (error) {
-        if (isCancelled) {
-          return
-        }
-
-        setCheckoutStatus('pending')
-        setCheckoutStatusMessage(
-          error instanceof Error ? error.message : copy.checkoutError,
-        )
-      }
-    }
-
-    void verifyCheckout()
-
-    return () => {
-      isCancelled = true
-    }
-  }, [copy.checkoutError, copy.checkoutPendingBody, copy.checkoutVerifiedBody, preferredLocale])
-
   const readFileAsBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
@@ -656,6 +637,29 @@ function App() {
     } catch {
       throw new Error(copy.responseParseFailure)
     }
+  }
+
+  const persistPendingCheckout = (payload: PendingCheckoutPayload) => {
+    window.localStorage.setItem(PENDING_CHECKOUT_KEY, JSON.stringify(payload))
+  }
+
+  const readPendingCheckout = (): PendingCheckoutPayload | null => {
+    const rawPayload = window.localStorage.getItem(PENDING_CHECKOUT_KEY)
+
+    if (!rawPayload) {
+      return null
+    }
+
+    try {
+      return JSON.parse(rawPayload) as PendingCheckoutPayload
+    } catch {
+      window.localStorage.removeItem(PENDING_CHECKOUT_KEY)
+      return null
+    }
+  }
+
+  const clearPendingCheckout = () => {
+    window.localStorage.removeItem(PENDING_CHECKOUT_KEY)
   }
 
   const toggleTheme = () => {
@@ -718,19 +722,7 @@ function App() {
     setHairErrorMessage('')
   }
 
-  const handleStyleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    if (!stylePhotoFile) {
-      setStyleErrorMessage(copy.stylePhotoRequired)
-      return
-    }
-
-    if (!height.trim() || !weight.trim()) {
-      setStyleErrorMessage(copy.styleMetricsRequired)
-      return
-    }
-
+  const runStyleGeneration = async (payload: StyleGenerationPayload) => {
     try {
       setIsStyleLoading(true)
       setStyleErrorMessage('')
@@ -739,8 +731,11 @@ function App() {
       setStylePrompt('')
       setStyleNote('')
       setStyleCopyMessage('')
-
-      const imageBase64 = await readFileAsBase64(stylePhotoFile)
+      setView('style')
+      setStylePhotoPreview(payload.previewUrl)
+      setStylePhotoName(payload.photoName)
+      setHeight(payload.height)
+      setWeight(payload.weight)
 
       const response = await fetch('/api/style-report', {
         method: 'POST',
@@ -748,10 +743,10 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          height,
-          weight,
-          imageBase64,
-          mimeType: stylePhotoFile.type || 'image/jpeg',
+          height: payload.height,
+          weight: payload.weight,
+          imageBase64: payload.imageBase64,
+          mimeType: payload.mimeType,
           preferredLocale,
         }),
       })
@@ -777,14 +772,7 @@ function App() {
     }
   }
 
-  const handleHairSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    if (!hairPhotoFile) {
-      setHairErrorMessage(copy.hairPhotoRequired)
-      return
-    }
-
+  const runHairGeneration = async (payload: HairGenerationPayload) => {
     try {
       setIsHairLoading(true)
       setHairErrorMessage('')
@@ -793,8 +781,9 @@ function App() {
       setHairPrompt('')
       setHairNote('')
       setHairCopyMessage('')
-
-      const imageBase64 = await readFileAsBase64(hairPhotoFile)
+      setView('hair')
+      setHairPhotoPreview(payload.previewUrl)
+      setHairPhotoName(payload.photoName)
 
       const response = await fetch('/api/hairstyle-grid', {
         method: 'POST',
@@ -802,8 +791,8 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          imageBase64,
-          mimeType: hairPhotoFile.type || 'image/jpeg',
+          imageBase64: payload.imageBase64,
+          mimeType: payload.mimeType,
           preferredLocale,
         }),
       })
@@ -826,6 +815,87 @@ function App() {
       setHairErrorMessage(error instanceof Error ? error.message : fallback)
     } finally {
       setIsHairLoading(false)
+    }
+  }
+
+  const resumePendingCheckout = useEffectEvent(
+    async (pendingCheckout: PendingCheckoutPayload | null) => {
+      if (pendingCheckout?.kind === 'style') {
+        await runStyleGeneration(pendingCheckout)
+      }
+
+      if (pendingCheckout?.kind === 'hair') {
+        await runHairGeneration(pendingCheckout)
+      }
+    },
+  )
+
+  const handleStyleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!stylePhotoFile) {
+      setStyleErrorMessage(copy.stylePhotoRequired)
+      return
+    }
+
+    if (!height.trim() || !weight.trim()) {
+      setStyleErrorMessage(copy.styleMetricsRequired)
+      return
+    }
+
+    try {
+      const imageBase64 = await readFileAsBase64(stylePhotoFile)
+      const payload: StyleGenerationPayload = {
+        kind: 'style',
+        height,
+        weight,
+        imageBase64,
+        mimeType: stylePhotoFile.type || 'image/jpeg',
+        previewUrl: `data:${stylePhotoFile.type || 'image/jpeg'};base64,${imageBase64}`,
+        photoName: stylePhotoFile.name,
+      }
+
+      if (!isPurchaseVerified) {
+        persistPendingCheckout(payload)
+        await startCheckout()
+        return
+      }
+
+      await runStyleGeneration(payload)
+    } catch (error) {
+      const fallback = copy.styleFetchError
+      setStyleErrorMessage(error instanceof Error ? error.message : fallback)
+    }
+  }
+
+  const handleHairSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!hairPhotoFile) {
+      setHairErrorMessage(copy.hairPhotoRequired)
+      return
+    }
+
+    try {
+      const imageBase64 = await readFileAsBase64(hairPhotoFile)
+      const payload: HairGenerationPayload = {
+        kind: 'hair',
+        imageBase64,
+        mimeType: hairPhotoFile.type || 'image/jpeg',
+        previewUrl: `data:${hairPhotoFile.type || 'image/jpeg'};base64,${imageBase64}`,
+        photoName: hairPhotoFile.name,
+      }
+
+      if (!isPurchaseVerified) {
+        persistPendingCheckout(payload)
+        await startCheckout()
+        return
+      }
+
+      await runHairGeneration(payload)
+    } catch (error) {
+      const fallback = copy.hairFetchError
+      setHairErrorMessage(error instanceof Error ? error.message : fallback)
     }
   }
 
@@ -932,6 +1002,72 @@ function App() {
     }
   }
 
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const checkoutFlag = url.searchParams.get('checkout')
+    const checkoutId = url.searchParams.get('checkout_id')
+
+    if (checkoutFlag !== 'success' || !checkoutId) {
+      return
+    }
+
+    let isCancelled = false
+
+    const verifyCheckout = async () => {
+      try {
+        const response = await fetch(
+          `/api/checkout-status?checkout_id=${encodeURIComponent(checkoutId)}&preferred_locale=${encodeURIComponent(preferredLocale)}`,
+        )
+        const rawText = await response.text()
+        const data = rawText.trim()
+          ? (JSON.parse(rawText) as CheckoutStatusResponse)
+          : null
+
+        if (!response.ok || !data?.status) {
+          throw new Error(data?.error ?? copy.checkoutError)
+        }
+
+        if (isCancelled) {
+          return
+        }
+
+        if (data.status === 'succeeded') {
+          setCheckoutStatus('verified')
+          setCheckoutStatusMessage(copy.checkoutVerifiedBody)
+          window.localStorage.setItem(PURCHASE_VERIFIED_KEY, 'true')
+          setIsPurchaseVerified(true)
+
+          const pendingCheckout = readPendingCheckout()
+          clearPendingCheckout()
+          await resumePendingCheckout(pendingCheckout)
+
+          url.searchParams.delete('checkout')
+          url.searchParams.delete('checkout_id')
+          window.history.replaceState(null, '', url.toString())
+          return
+        }
+
+        setCheckoutStatus('pending')
+        setCheckoutStatusMessage(copy.checkoutPendingBody)
+      } catch (error) {
+        if (isCancelled) {
+          return
+        }
+
+        setCheckoutStatus('pending')
+        setCheckoutStatusMessage(
+          error instanceof Error ? error.message : copy.checkoutError,
+        )
+      }
+    }
+
+    void verifyCheckout()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [copy.checkoutError, copy.checkoutPendingBody, copy.checkoutVerifiedBody, preferredLocale])
+
   const activeNav = view === 'style'
     ? 'gallery'
     : view === 'hair'
@@ -1035,34 +1171,8 @@ function App() {
     )
   }
 
-  const renderCheckoutCard = () => (
-    <section className="utility-card checkout-card">
-      <div className="utility-copy">
-        <div className="utility-icon">
-          <SparkleIcon className="utility-icon-svg" />
-        </div>
-        <div>
-          <h4>{copy.checkoutTitle}</h4>
-          <p>{copy.checkoutDescription}</p>
-        </div>
-      </div>
-      {checkoutErrorMessage ? (
-        <p className="status-message error">{checkoutErrorMessage}</p>
-      ) : null}
-      <button
-        className="utility-button checkout-button"
-        disabled={isCheckoutLoading}
-        onClick={startCheckout}
-        type="button"
-      >
-        <SparkleIcon className="button-icon" />
-        <span>{isCheckoutLoading ? copy.checkoutLoading : copy.checkoutButton}</span>
-      </button>
-    </section>
-  )
-
   const renderCheckoutStatusCard = () => {
-    if (checkoutStatus === 'idle') {
+    if (checkoutStatus === 'idle' && !checkoutErrorMessage) {
       return null
     }
 
@@ -1074,11 +1184,13 @@ function App() {
           </div>
           <div>
             <h4>
-              {checkoutStatus === 'verified'
+              {checkoutErrorMessage
+                ? copy.checkoutTitle
+                : checkoutStatus === 'verified'
                 ? copy.checkoutVerifiedTitle
                 : copy.checkoutPendingTitle}
             </h4>
-            <p>{checkoutStatusMessage}</p>
+            <p>{checkoutErrorMessage || checkoutStatusMessage}</p>
           </div>
         </div>
       </section>
@@ -1225,8 +1337,6 @@ function App() {
                   </div>
                 </button>
               </section>
-
-              {renderCheckoutCard()}
             </>
           ) : null}
 
@@ -1293,8 +1403,18 @@ function App() {
                     <p className="status-message error">{styleErrorMessage}</p>
                   ) : null}
 
-                  <button className="action-button" disabled={isStyleLoading} type="submit">
-                    {isStyleLoading ? copy.styleActionLoading : copy.styleAction}
+                  <button
+                    className="action-button"
+                    disabled={isStyleLoading || isCheckoutLoading}
+                    type="submit"
+                  >
+                    {isStyleLoading
+                      ? copy.styleActionLoading
+                      : isCheckoutLoading && !isPurchaseVerified
+                        ? copy.stylePayActionLoading
+                        : isPurchaseVerified
+                          ? copy.styleAction
+                          : copy.stylePayAction}
                   </button>
                 </form>
               </section>
@@ -1341,8 +1461,6 @@ function App() {
                 copyMessage: styleCopyMessage,
                 onCopy: copyStylePrompt,
               })}
-
-              {renderCheckoutCard()}
             </>
           ) : null}
 
@@ -1379,8 +1497,19 @@ function App() {
                   <p className="status-message error">{hairErrorMessage}</p>
                 ) : null}
 
-                <button className="action-button" disabled={isHairLoading} type="submit" form="hair-form-hidden">
-                  {isHairLoading ? copy.hairActionLoading : copy.hairAction}
+                <button
+                  className="action-button"
+                  disabled={isHairLoading || isCheckoutLoading}
+                  type="submit"
+                  form="hair-form-hidden"
+                >
+                  {isHairLoading
+                    ? copy.hairActionLoading
+                    : isCheckoutLoading && !isPurchaseVerified
+                      ? copy.hairPayActionLoading
+                      : isPurchaseVerified
+                        ? copy.hairAction
+                        : copy.hairPayAction}
                 </button>
                 <form className="visually-hidden" id="hair-form-hidden" onSubmit={handleHairSubmit} />
               </section>
@@ -1429,8 +1558,6 @@ function App() {
                 copyMessage: hairCopyMessage,
                 onCopy: copyHairPrompt,
               })}
-
-              {renderCheckoutCard()}
             </>
           ) : null}
         </main>
