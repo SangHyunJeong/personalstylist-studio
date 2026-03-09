@@ -11,7 +11,26 @@ type StyleReportResponse = {
   error?: string
 }
 
+type Theme = 'light' | 'dark'
+
+const getInitialTheme = (): Theme => {
+  if (typeof window === 'undefined') {
+    return 'light'
+  }
+
+  const storedTheme = window.localStorage.getItem('theme')
+
+  if (storedTheme === 'light' || storedTheme === 'dark') {
+    return storedTheme
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light'
+}
+
 function App() {
+  const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const [height, setHeight] = useState('')
   const [weight, setWeight] = useState('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -21,6 +40,11 @@ function App() {
   const [errorMessage, setErrorMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    window.localStorage.setItem('theme', theme)
+  }, [theme])
 
   useEffect(() => {
     return () => {
@@ -175,10 +199,20 @@ function App() {
     }
   }
 
+  const toggleTheme = () => {
+    setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))
+  }
+
   return (
     <main className="app-shell">
       <section className="hero-panel">
-        <p className="eyebrow">PERSONAL STYLIST</p>
+        <div className="hero-topbar">
+          <p className="eyebrow">PERSONAL STYLIST</p>
+          <button className="theme-toggle" onClick={toggleTheme} type="button">
+            {theme === 'dark' ? '라이트 모드' : '다크 모드'}
+          </button>
+        </div>
+
         <h1>내 체형에 맞는 스타일 제안을 시작해보세요.</h1>
         <p className="hero-copy">
           사진 한 장과 기본 신체 정보를 입력하면, AI 스타일리스트가 실루엣,
@@ -193,7 +227,7 @@ function App() {
         </div>
       </section>
 
-      <section className="form-panel">
+      <section className="content-panel">
         <div className="form-header">
           <p>스타일 프로필 만들기</p>
           <h2>기본 정보 입력</h2>
@@ -239,7 +273,7 @@ function App() {
                 <input
                   inputMode="decimal"
                   onChange={(event) => setHeight(event.target.value)}
-                  placeholder="예: 168"
+                  placeholder="예: 170"
                   type="text"
                   value={height}
                 />
@@ -253,7 +287,7 @@ function App() {
                 <input
                   inputMode="decimal"
                   onChange={(event) => setWeight(event.target.value)}
-                  placeholder="예: 55"
+                  placeholder="예: 70"
                   type="text"
                   value={weight}
                 />
@@ -268,26 +302,26 @@ function App() {
             {isLoading ? '스타일 보고서 생성 중...' : '스타일 추천 시작하기'}
           </button>
         </form>
+      </section>
 
-        <section className="report-panel">
-          <div className="report-header">
-            <p>AI Style Report</p>
-            <h3>스타일 컨설팅 보고서</h3>
+      <section className="report-panel">
+        <div className="report-header">
+          <p>AI Style Report</p>
+          <h3>스타일 컨설팅 보고서</h3>
+        </div>
+
+        {report ? (
+          <article className="report-body">
+            {report.split('\n').map((line, index) => (
+              <p key={`${line}-${index}`}>{line}</p>
+            ))}
+          </article>
+        ) : (
+          <div className="report-placeholder">
+            사진과 체형 정보를 입력한 뒤 보고서를 생성하면, 실루엣 분석과 추천
+            룩 방향이 여기에 표시됩니다.
           </div>
-
-          {report ? (
-            <article className="report-body">
-              {report.split('\n').map((line, index) => (
-                <p key={`${line}-${index}`}>{line}</p>
-              ))}
-            </article>
-          ) : (
-            <div className="report-placeholder">
-              사진과 체형 정보를 입력한 뒤 보고서를 생성하면, 실루엣 분석과 추천
-              룩 방향이 여기에 표시됩니다.
-            </div>
-          )}
-        </section>
+        )}
       </section>
     </main>
   )

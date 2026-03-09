@@ -6,10 +6,58 @@
   background:
     radial-gradient(circle at top, rgba(217, 227, 241, 0.8), transparent 30%),
     linear-gradient(180deg, #f4efe8 0%, #f7f4ef 100%);
+  --app-bg:
+    radial-gradient(circle at top, rgba(217, 227, 241, 0.8), transparent 30%),
+    linear-gradient(180deg, #f4efe8 0%, #f7f4ef 100%);
+  --app-text: #1e2430;
+  --surface-bg: rgba(255, 250, 245, 0.92);
+  --surface-border: rgba(227, 214, 202, 0.9);
+  --surface-shadow: 0 28px 60px rgba(47, 58, 79, 0.12);
+  --hero-start: #1f3c88;
+  --hero-end: #4d8fd2;
+  --accent-color: #af6f4d;
+  --accent-strong: #40536d;
+  --text-strong: #1e2430;
+  --text-body: #2c3444;
+  --text-muted: #6f7683;
+  --field-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(247, 238, 231, 0.94));
+  --field-active-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(235, 244, 255, 0.92));
+  --field-border: #dcc9bc;
+  --focus-ring: rgba(175, 111, 77, 0.14);
+  --button-start: #1e2430;
+  --button-end: #40536d;
+  --error-bg: rgba(180, 56, 43, 0.08);
+  --error-text: #9d2f22;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme='dark'] {
+  color: #eef2f7;
+  --app-bg:
+    radial-gradient(circle at top, rgba(55, 82, 126, 0.44), transparent 28%),
+    linear-gradient(180deg, #101721 0%, #151e2b 100%);
+  --app-text: #eef2f7;
+  --surface-bg: rgba(20, 27, 39, 0.92);
+  --surface-border: rgba(72, 88, 117, 0.64);
+  --surface-shadow: 0 30px 60px rgba(0, 0, 0, 0.35);
+  --hero-start: #10264f;
+  --hero-end: #315d91;
+  --accent-color: #f0b08b;
+  --accent-strong: #9bb0d7;
+  --text-strong: #f4f7fb;
+  --text-body: #d7ddea;
+  --text-muted: #9ba7be;
+  --field-bg: linear-gradient(180deg, rgba(25, 34, 48, 0.96), rgba(18, 26, 38, 0.96));
+  --field-active-bg: linear-gradient(180deg, rgba(31, 45, 68, 0.98), rgba(25, 36, 54, 0.98));
+  --field-border: rgba(82, 98, 128, 0.88);
+  --focus-ring: rgba(155, 176, 215, 0.18);
+  --button-start: #5e81bc;
+  --button-end: #7aa0d8;
+  --error-bg: rgba(183, 70, 58, 0.18);
+  --error-text: #ffb1a6;
 }
 
 * {
@@ -24,6 +72,11 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  color: var(--app-text);
+  background: var(--app-bg);
+  transition:
+    background 180ms ease,
+    color 180ms ease;
 }
 
 button,
