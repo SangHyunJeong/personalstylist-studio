@@ -1279,19 +1279,23 @@ function App() {
             <p>{copy.checkoutDescription}</p>
           </div>
         </div>
-        <button
-          className="utility-button checkout-button"
-          disabled={isCheckoutLoading}
-          onClick={() => {
-            void startCheckout()
-          }}
-          type="button"
-        >
-          <SparkleIcon className="button-icon" />
-          <span>
-            {isCheckoutLoading ? copy.checkoutLoading : copy.checkoutButton}
-          </span>
-        </button>
+        {isPurchaseVerified ? (
+          <p className="status-message success">{copy.checkoutVerifiedBody}</p>
+        ) : (
+          <button
+            className="utility-button checkout-button"
+            disabled={isCheckoutLoading}
+            onClick={() => {
+              void startCheckout()
+            }}
+            type="button"
+          >
+            <SparkleIcon className="button-icon" />
+            <span>
+              {isCheckoutLoading ? copy.checkoutLoading : copy.checkoutButton}
+            </span>
+          </button>
+        )}
       </section>
     </>
   )
