@@ -1,5 +1,7 @@
 interface Env {
   GEMINI_API_KEY?: string
+  POLAR_ACCESS_TOKEN?: string
+  POLAR_SERVER?: string
 }
 
 interface PagesContext {
@@ -45,12 +47,17 @@ const IMAGE_MODELS = [
 ]
 
 const jsonResponse = (
-  body: Record<string, string>,
+  body: Record<string, string | boolean>,
   status: number,
 ) => Response.json(body, { status })
 
 const isKoreanLocale = (preferredLocale?: string) =>
   preferredLocale?.toLowerCase().startsWith('ko') ?? false
+
+const getBaseApiUrl = (server?: string) =>
+  server === 'sandbox'
+    ? 'https://sandbox-api.polar.sh'
+    : 'https://api.polar.sh'
 
 const parseGeminiResponse = async (response: Response) => {
   const rawText = await response.text()
@@ -98,6 +105,32 @@ const callGemini = async ({
     response,
     json,
   }
+}
+
+const refundOrder = async ({
+  env,
+  orderId,
+}: {
+  env: Env
+  orderId?: string
+}) => {
+  if (!env.POLAR_ACCESS_TOKEN || !orderId) {
+    return false
+  }
+
+  const response = await fetch(`${getBaseApiUrl(env.POLAR_SERVER)}/v1/refunds/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      order_id: orderId,
+      reason: 'Automatic refund after style generation failure',
+    }),
+  })
+
+  return response.ok
 }
 
 const extractText = (parts: GeminiPart[] = []) =>
@@ -238,6 +271,8 @@ const generateText = async ({
 
 export async function onRequestPost(context: PagesContext) {
   const { request, env } = context
+  let preferredLocale: string | undefined
+  let orderId: string | undefined
 
   try {
     if (!env.GEMINI_API_KEY) {
@@ -249,11 +284,12 @@ export async function onRequestPost(context: PagesContext) {
 
     let body: {
       height?: string
-      weight?: string
-      imageBase64?: string
-      mimeType?: string
-      preferredLocale?: string
-    }
+        weight?: string
+        imageBase64?: string
+        mimeType?: string
+        preferredLocale?: string
+        orderId?: string
+      }
 
     try {
       body = await request.json()
@@ -264,7 +300,9 @@ export async function onRequestPost(context: PagesContext) {
       )
     }
 
-    const { height, weight, imageBase64, mimeType, preferredLocale } = body
+    const { height, weight, imageBase64, mimeType } = body
+    preferredLocale = body.preferredLocale
+    orderId = body.orderId
 
     if (!height || !weight || !imageBase64 || !mimeType) {
       return jsonResponse(
@@ -312,13 +350,10 @@ export async function onRequestPost(context: PagesContext) {
     }
 
     if (!report) {
-      return jsonResponse(
-        {
-          error: isKoreanLocale(preferredLocale)
-            ? 'Gemini 응답에서 스타일 보고서를 찾을 수 없습니다.'
-            : 'The Gemini response did not contain a style report.',
-        },
-        502,
+      throw new Error(
+        isKoreanLocale(preferredLocale)
+          ? 'Gemini 응답에서 스타일 보고서를 찾을 수 없습니다.'
+          : 'The Gemini response did not contain a style report.',
       )
     }
 
@@ -379,12 +414,22 @@ export async function onRequestPost(context: PagesContext) {
             : 'Style image generation could not be completed, so only a prompt for your external AI tool was provided.',
     })
   } catch (error) {
+    const refundRequested = await refundOrder({ env, orderId })
+
     return jsonResponse(
       {
-        error:
-          error instanceof Error
-            ? error.message
+        error: error instanceof Error
+          ? refundRequested
+            ? `${error.message} ${
+                isKoreanLocale(preferredLocale)
+                  ? '결제가 자동 환불 처리되었습니다.'
+                  : 'The payment was refunded automatically.'
+              }`
+            : error.message
+          : isKoreanLocale(preferredLocale)
+            ? '스타일 보고서를 생성하는 중 서버 오류가 발생했습니다.'
             : 'A server error occurred while generating the style report.',
+        refundRequested,
       },
       500,
     )

@@ -17,6 +17,7 @@ type StyleReportResponse = {
   prompt?: string
   note?: string
   error?: string
+  refundRequested?: boolean
 }
 
 type HairRecommendationResponse = {
@@ -27,6 +28,7 @@ type HairRecommendationResponse = {
   prompt?: string
   note?: string
   error?: string
+  refundRequested?: boolean
 }
 
 type CheckoutResponse = {
@@ -38,6 +40,13 @@ type CheckoutStatusResponse = {
   status?: string
   productId?: string
   orderId?: string
+  customerEmail?: string
+  error?: string
+}
+
+type SendReportEmailResponse = {
+  id?: string
+  message?: string
   error?: string
 }
 
@@ -73,8 +82,12 @@ const homeHairImage =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuCiSoCbdZuRJXGn4Kar-8Sh8WklP3L-cazvB65L2O-j9SDHoSd2DGfiznQyEpdI_JEZEkTKsoK9tkDC_HwU03HvOSayIiYsiUnoZLr9bbYrj-SDFS-3Yi5Ta8VVZCQB0B2ZgNvncqijcLi6l2T22UzdyOUKEdlD4ZACHKAIRA2AVFUpLVuPWL1RrR0hqAK8bGBc-U6yjKz5NihvIWvV4WuqWfYspWoWrYPUkhuUzxf_UMnLMJA2-NFcnaxo7EKcfJOnOjTNIvVIMg5I'
 
 const PURCHASE_VERIFIED_KEY = 'polar_purchase_verified'
+const PURCHASE_ORDER_ID_KEY = 'polar_purchase_order_id'
+const PURCHASE_EMAIL_KEY = 'polar_purchase_email'
 const PENDING_CHECKOUT_KEY = 'polar_pending_checkout_payload'
 const PENDING_ENTRY_VIEW_KEY = 'polar_pending_entry_view'
+const MAX_UPLOAD_BYTES = 1_200_000
+const MAX_UPLOAD_DIMENSION = 1600
 
 const getInitialTheme = (): Theme => {
   if (typeof window === 'undefined') {
@@ -137,6 +150,22 @@ const getInitialPurchaseVerified = (): boolean => {
   return window.localStorage.getItem(PURCHASE_VERIFIED_KEY) === 'true'
 }
 
+const getInitialPurchaseOrderId = (): string => {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  return window.localStorage.getItem(PURCHASE_ORDER_ID_KEY) ?? ''
+}
+
+const getInitialPurchaseEmail = (): string => {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  return window.localStorage.getItem(PURCHASE_EMAIL_KEY) ?? ''
+}
+
 const localeCopy = {
   ko: {
     languageLabel: 'Language',
@@ -145,6 +174,14 @@ const localeCopy = {
     noImageSelected: '아직 선택된 이미지가 없습니다.',
     copySuccess: '프롬프트를 클립보드에 복사했습니다.',
     copyFailure: '클립보드 복사에 실패했습니다. 직접 선택해서 복사해 주세요.',
+    emailSendTitle: '이메일로 결과 받기',
+    emailSendDescription:
+      'Polar 결제에 사용한 이메일 주소로 현재 리포트를 전송합니다.',
+    emailSendAction: '결제 이메일로 보내기',
+    emailSendLoading: '이메일 전송 중...',
+    emailSendUnavailable:
+      '결제 이메일 정보를 찾을 수 없습니다. 새 결제 후 다시 시도해 주세요.',
+    emailSendTarget: '전송 대상',
     reportImageSaveAction: '리포트를 이미지로 저장하기',
     reportImageSaveLoading: '이미지 저장 준비 중...',
     reportImageShareAction: '외부로 공유하기',
@@ -260,6 +297,14 @@ const localeCopy = {
     noImageSelected: 'No image selected yet.',
     copySuccess: 'Prompt copied to your clipboard.',
     copyFailure: 'Clipboard copy failed. Please copy it manually.',
+    emailSendTitle: 'Send result by email',
+    emailSendDescription:
+      'Send the current report to the email address used during Polar checkout.',
+    emailSendAction: 'Send to checkout email',
+    emailSendLoading: 'Sending email...',
+    emailSendUnavailable:
+      'The checkout email could not be found on this device. Please complete checkout again and retry.',
+    emailSendTarget: 'Delivery target',
     reportImageSaveAction: 'Save report as image',
     reportImageSaveLoading: 'Preparing image...',
     reportImageShareAction: 'Share externally',
@@ -626,6 +671,14 @@ function App() {
   const [checkoutStatus, setCheckoutStatus] = useState<'idle' | 'pending' | 'verified'>('idle')
   const [checkoutStatusMessage, setCheckoutStatusMessage] = useState('')
   const [isPurchaseVerified, setIsPurchaseVerified] = useState(getInitialPurchaseVerified)
+  const [purchaseOrderId, setPurchaseOrderId] = useState(getInitialPurchaseOrderId)
+  const [purchaseEmail, setPurchaseEmail] = useState(getInitialPurchaseEmail)
+  const [styleEmailMessage, setStyleEmailMessage] = useState('')
+  const [styleEmailTone, setStyleEmailTone] = useState<'success' | 'error' | 'fallback'>('success')
+  const [isStyleEmailSending, setIsStyleEmailSending] = useState(false)
+  const [hairEmailMessage, setHairEmailMessage] = useState('')
+  const [hairEmailTone, setHairEmailTone] = useState<'success' | 'error' | 'fallback'>('success')
+  const [isHairEmailSending, setIsHairEmailSending] = useState(false)
   const copy = localeCopy[language]
   const policyCopy = policyDocuments[language]
   const preferredLocale = language === 'ko' ? 'ko-KR' : 'en-US'
@@ -639,6 +692,20 @@ function App() {
     window.localStorage.setItem('language', language)
     document.documentElement.lang = language === 'ko' ? 'ko' : 'en'
   }, [language])
+
+  useEffect(() => {
+    if (purchaseOrderId) {
+      window.localStorage.setItem(PURCHASE_ORDER_ID_KEY, purchaseOrderId)
+    } else {
+      window.localStorage.removeItem(PURCHASE_ORDER_ID_KEY)
+    }
+
+    if (purchaseEmail) {
+      window.localStorage.setItem(PURCHASE_EMAIL_KEY, purchaseEmail)
+    } else {
+      window.localStorage.removeItem(PURCHASE_EMAIL_KEY)
+    }
+  }, [purchaseEmail, purchaseOrderId])
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -725,6 +792,101 @@ function App() {
     } catch {
       throw new Error(copy.responseParseFailure)
     }
+  }
+
+  const canvasToBlob = (
+    canvas: HTMLCanvasElement,
+    type: string,
+    quality?: number,
+  ) =>
+    new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error(copy.imageReadFailure))
+          return
+        }
+
+        resolve(blob)
+      }, type, quality)
+    })
+
+  const loadImageFromFile = (file: File) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file)
+      const image = new Image()
+
+      image.onload = () => {
+        URL.revokeObjectURL(objectUrl)
+        resolve(image)
+      }
+
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl)
+        reject(new Error(copy.imageReadFailure))
+      }
+
+      image.src = objectUrl
+    })
+
+  const compressImageForUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      return file
+    }
+
+    const image = await loadImageFromFile(file)
+    const scale = Math.min(
+      1,
+      MAX_UPLOAD_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight),
+    )
+    const targetWidth = Math.max(1, Math.round(image.naturalWidth * scale))
+    const targetHeight = Math.max(1, Math.round(image.naturalHeight * scale))
+
+    if (scale === 1 && file.size <= MAX_UPLOAD_BYTES) {
+      return file
+    }
+
+    const canvas = document.createElement('canvas')
+    canvas.width = targetWidth
+    canvas.height = targetHeight
+    const context = canvas.getContext('2d')
+
+    if (!context) {
+      return file
+    }
+
+    context.drawImage(image, 0, 0, targetWidth, targetHeight)
+
+    let quality = 0.88
+    let blob = await canvasToBlob(canvas, 'image/jpeg', quality)
+
+    while (blob.size > MAX_UPLOAD_BYTES && quality > 0.56) {
+      quality -= 0.08
+      blob = await canvasToBlob(canvas, 'image/jpeg', quality)
+    }
+
+    if (blob.size >= file.size && scale === 1) {
+      return file
+    }
+
+    return new File(
+      [blob],
+      `${file.name.replace(/\.[^.]+$/, '') || 'upload'}.jpg`,
+      {
+        type: 'image/jpeg',
+        lastModified: file.lastModified,
+      },
+    )
+  }
+
+  const clearPurchaseState = () => {
+    window.localStorage.removeItem(PURCHASE_VERIFIED_KEY)
+    window.localStorage.removeItem(PURCHASE_ORDER_ID_KEY)
+    window.localStorage.removeItem(PURCHASE_EMAIL_KEY)
+    setIsPurchaseVerified(false)
+    setPurchaseOrderId('')
+    setPurchaseEmail('')
+    setCheckoutStatus('idle')
+    setCheckoutStatusMessage('')
   }
 
   const persistPendingCheckout = (payload: PendingCheckoutPayload) => {
@@ -839,6 +1001,7 @@ function App() {
       setStyleCopyMessage('')
       setStyleAssetMessage('')
       setStyleAssetAction('idle')
+      setStyleEmailMessage('')
       setView('style')
       setStylePhotoPreview(payload.previewUrl)
       setStylePhotoName(payload.photoName)
@@ -856,12 +1019,16 @@ function App() {
           imageBase64: payload.imageBase64,
           mimeType: payload.mimeType,
           preferredLocale,
+          orderId: purchaseOrderId,
         }),
       })
 
       const data = await parseResponseJson<StyleReportResponse>(response)
 
       if (!response.ok || !data?.report) {
+        if (data?.refundRequested) {
+          clearPurchaseState()
+        }
         throw new Error(data?.error ?? copy.styleSubmitError)
       }
 
@@ -891,6 +1058,7 @@ function App() {
       setHairCopyMessage('')
       setHairAssetMessage('')
       setHairAssetAction('idle')
+      setHairEmailMessage('')
       setView('hair')
       setHairPhotoPreview(payload.previewUrl)
       setHairPhotoName(payload.photoName)
@@ -904,12 +1072,16 @@ function App() {
           imageBase64: payload.imageBase64,
           mimeType: payload.mimeType,
           preferredLocale,
+          orderId: purchaseOrderId,
         }),
       })
 
       const data = await parseResponseJson<HairRecommendationResponse>(response)
 
       if (!response.ok || !data?.description) {
+        if (data?.refundRequested) {
+          clearPurchaseState()
+        }
         throw new Error(data?.error ?? copy.hairSubmitError)
       }
 
@@ -954,14 +1126,15 @@ function App() {
     }
 
     try {
-      const imageBase64 = await readFileAsBase64(stylePhotoFile)
+      const uploadFile = await compressImageForUpload(stylePhotoFile)
+      const imageBase64 = await readFileAsBase64(uploadFile)
       const payload: StyleGenerationPayload = {
         kind: 'style',
         height,
         weight,
         imageBase64,
-        mimeType: stylePhotoFile.type || 'image/jpeg',
-        previewUrl: `data:${stylePhotoFile.type || 'image/jpeg'};base64,${imageBase64}`,
+        mimeType: uploadFile.type || 'image/jpeg',
+        previewUrl: `data:${uploadFile.type || 'image/jpeg'};base64,${imageBase64}`,
         photoName: stylePhotoFile.name,
       }
 
@@ -987,12 +1160,13 @@ function App() {
     }
 
     try {
-      const imageBase64 = await readFileAsBase64(hairPhotoFile)
+      const uploadFile = await compressImageForUpload(hairPhotoFile)
+      const imageBase64 = await readFileAsBase64(uploadFile)
       const payload: HairGenerationPayload = {
         kind: 'hair',
         imageBase64,
-        mimeType: hairPhotoFile.type || 'image/jpeg',
-        previewUrl: `data:${hairPhotoFile.type || 'image/jpeg'};base64,${imageBase64}`,
+        mimeType: uploadFile.type || 'image/jpeg',
+        previewUrl: `data:${uploadFile.type || 'image/jpeg'};base64,${imageBase64}`,
         photoName: hairPhotoFile.name,
       }
 
@@ -1079,6 +1253,95 @@ function App() {
 
   const copyHairPrompt = async () => {
     await copyText(hairPrompt, setHairCopyMessage, setHairCopyMessage)
+  }
+
+  const requestReportEmail = async ({
+    kind,
+    content,
+    prompt,
+    note,
+    imageDataUrl,
+    setSending,
+    setMessage,
+    setTone,
+  }: {
+    kind: 'style' | 'hair'
+    content: string
+    prompt: string
+    note: string
+    imageDataUrl: string
+    setSending: (value: boolean) => void
+    setMessage: (value: string) => void
+    setTone: (value: 'success' | 'error' | 'fallback') => void
+  }) => {
+    if (!purchaseEmail.trim()) {
+      setTone('error')
+      setMessage(copy.emailSendUnavailable)
+      return
+    }
+
+    try {
+      setSending(true)
+      setMessage('')
+
+      const response = await fetch('/api/send-report-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          kind,
+          language,
+          toEmail: purchaseEmail,
+          content,
+          prompt,
+          note,
+          imageDataUrl: imageDataUrl || undefined,
+        }),
+      })
+
+      const data = await parseResponseJson<SendReportEmailResponse>(response)
+
+      if (!response.ok || !data?.id) {
+        throw new Error(data?.error ?? copy.emailSendUnavailable)
+      }
+
+      setTone('success')
+      setMessage(data.message ?? '')
+    } catch (error) {
+      setTone('error')
+      setMessage(
+        error instanceof Error ? error.message : copy.emailSendUnavailable,
+      )
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const sendStyleReportEmail = async () => {
+    await requestReportEmail({
+      kind: 'style',
+      content: styleReport,
+      prompt: stylePrompt,
+      note: styleNote,
+      imageDataUrl: styleResultImage,
+      setSending: setIsStyleEmailSending,
+      setMessage: setStyleEmailMessage,
+      setTone: setStyleEmailTone,
+    })
+  }
+
+  const sendHairReportEmail = async () => {
+    await requestReportEmail({
+      kind: 'hair',
+      content: hairDescription,
+      prompt: hairPrompt,
+      note: hairNote,
+      imageDataUrl: hairResultImage,
+      setSending: setIsHairEmailSending,
+      setMessage: setHairEmailMessage,
+      setTone: setHairEmailTone,
+    })
   }
 
   const createReportFile = async (
@@ -1313,6 +1576,8 @@ function App() {
           setCheckoutStatusMessage(copy.checkoutVerifiedBody)
           window.localStorage.setItem(PURCHASE_VERIFIED_KEY, 'true')
           setIsPurchaseVerified(true)
+          setPurchaseOrderId(data.orderId ?? '')
+          setPurchaseEmail(data.customerEmail ?? '')
 
           const pendingCheckout = readPendingCheckout()
           const pendingEntryView = readPendingEntryView()
@@ -1448,6 +1713,54 @@ function App() {
           <CopyIcon className="button-icon" />
           <span>{copy.utilityButton}</span>
         </button>
+      </section>
+    )
+  }
+
+  const renderEmailDeliveryCard = ({
+    hasContent,
+    message,
+    tone,
+    isSending,
+    onSend,
+  }: {
+    hasContent: boolean
+    message: string
+    tone: 'success' | 'error' | 'fallback'
+    isSending: boolean
+    onSend: () => Promise<void>
+  }) => {
+    if (!hasContent) {
+      return null
+    }
+
+    return (
+      <section className="utility-card delivery-card">
+        <div className="utility-copy">
+          <div className="utility-icon">
+            <SparkleIcon className="utility-icon-svg" />
+          </div>
+          <div>
+            <h4>{copy.emailSendTitle}</h4>
+            <p>{copy.emailSendDescription}</p>
+          </div>
+        </div>
+        <p className="delivery-target">
+          <strong>{copy.emailSendTarget}</strong>
+          <span>{purchaseEmail || copy.emailSendUnavailable}</span>
+        </p>
+        <button
+          className="utility-button report-action-button"
+          disabled={isSending || !purchaseEmail}
+          onClick={() => {
+            void onSend()
+          }}
+          type="button"
+        >
+          <SparkleIcon className="button-icon" />
+          <span>{isSending ? copy.emailSendLoading : copy.emailSendAction}</span>
+        </button>
+        {message ? <p className={`status-message ${tone}`}>{message}</p> : null}
       </section>
     )
   }
@@ -1933,6 +2246,14 @@ function App() {
                 onShare: shareStyleReportImage,
               })}
 
+              {renderEmailDeliveryCard({
+                hasContent: Boolean(styleReport),
+                message: styleEmailMessage,
+                tone: styleEmailTone,
+                isSending: isStyleEmailSending,
+                onSend: sendStyleReportEmail,
+              })}
+
               {renderPromptUtility({
                 title: copy.stylePromptTitle,
                 description: copy.stylePromptDescription,
@@ -2044,6 +2365,14 @@ function App() {
                 tone: hairAssetTone,
                 onSave: saveHairReportImage,
                 onShare: shareHairReportImage,
+              })}
+
+              {renderEmailDeliveryCard({
+                hasContent: Boolean(hairResultImage || hairDescription),
+                message: hairEmailMessage,
+                tone: hairEmailTone,
+                isSending: isHairEmailSending,
+                onSend: sendHairReportEmail,
               })}
 
               {renderPromptUtility({

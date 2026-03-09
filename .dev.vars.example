@@ -2,3 +2,6 @@ GEMINI_API_KEY=your_google_ai_studio_api_key
 POLAR_ACCESS_TOKEN=your_polar_organization_access_token
 POLAR_SERVER=sandbox
 POLAR_WEBHOOK_SECRET=your_polar_webhook_secret
+RESEND_API_KEY=your_resend_api_key
+RESEND_FROM_EMAIL=Personal AI Stylist <noreply@personalstylist.site>
+RESEND_REPLY_TO=support@personalstylist.site

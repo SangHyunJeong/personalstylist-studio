@@ -12,6 +12,7 @@ type PolarCheckoutStatusResponse = {
   status?: string
   product_id?: string
   order_id?: string
+  customer_email?: string
   error?: {
     message?: string
   }
@@ -86,5 +87,6 @@ export async function onRequestGet(context: PagesContext) {
     status: polarJson.status,
     productId: polarJson.product_id ?? '',
     orderId: polarJson.order_id ?? '',
+    customerEmail: polarJson.customer_email ?? '',
   })
 }

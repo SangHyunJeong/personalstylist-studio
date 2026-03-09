@@ -1,5 +1,7 @@
 interface Env {
   GEMINI_API_KEY?: string
+  POLAR_ACCESS_TOKEN?: string
+  POLAR_SERVER?: string
 }
 
 interface PagesContext {
@@ -40,13 +42,18 @@ const IMAGE_MODELS = [
 const TEXT_FALLBACK_MODEL = 'gemini-3-flash-preview'
 
 const jsonResponse = (
-  body: Record<string, string>,
+  body: Record<string, string | boolean>,
   status: number,
 ) =>
   Response.json(body, { status })
 
 const isKoreanLocale = (preferredLocale?: string) =>
   preferredLocale?.toLowerCase().startsWith('ko') ?? false
+
+const getBaseApiUrl = (server?: string) =>
+  server === 'sandbox'
+    ? 'https://sandbox-api.polar.sh'
+    : 'https://api.polar.sh'
 
 const parseGeminiResponse = async (response: Response) => {
   const rawText = await response.text()
@@ -96,6 +103,32 @@ const callGemini = async ({
     response,
     json,
   }
+}
+
+const refundOrder = async ({
+  env,
+  orderId,
+}: {
+  env: Env
+  orderId?: string
+}) => {
+  if (!env.POLAR_ACCESS_TOKEN || !orderId) {
+    return false
+  }
+
+  const response = await fetch(`${getBaseApiUrl(env.POLAR_SERVER)}/v1/refunds/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      order_id: orderId,
+      reason: 'Automatic refund after hairstyle generation failure',
+    }),
+  })
+
+  return response.ok
 }
 
 const extractText = (parts: GeminiPart[] = []) =>
@@ -191,6 +224,8 @@ const buildGenericHairFallbackPromptRequest = (preferredLocale?: string) =>
 
 export async function onRequestPost(context: PagesContext) {
   const { request, env } = context
+  let preferredLocale: string | undefined
+  let orderId: string | undefined
 
   try {
     if (!env.GEMINI_API_KEY) {
@@ -203,10 +238,11 @@ export async function onRequestPost(context: PagesContext) {
     }
 
     let body: {
-      imageBase64?: string
-      mimeType?: string
-      preferredLocale?: string
-    }
+        imageBase64?: string
+        mimeType?: string
+        preferredLocale?: string
+        orderId?: string
+      }
 
     try {
       body = await request.json()
@@ -219,7 +255,9 @@ export async function onRequestPost(context: PagesContext) {
       )
     }
 
-    const { imageBase64, mimeType, preferredLocale } = body
+    const { imageBase64, mimeType } = body
+    preferredLocale = body.preferredLocale
+    orderId = body.orderId
 
     if (!imageBase64 || !mimeType) {
       return jsonResponse(
@@ -356,25 +394,29 @@ export async function onRequestPost(context: PagesContext) {
       }
     }
 
-    return jsonResponse(
-      {
-        error:
-          lastImageErrorMessage ||
-          (isKoreanLocale(preferredLocale)
-            ? '헤어스타일 추천을 생성하는 중 문제가 발생했습니다.'
-            : 'An issue occurred while generating the hairstyle recommendation.'),
-      },
-      500,
+    throw new Error(
+      lastImageErrorMessage ||
+      (isKoreanLocale(preferredLocale)
+        ? '헤어스타일 추천을 생성하는 중 문제가 발생했습니다.'
+        : 'An issue occurred while generating the hairstyle recommendation.'),
     )
   } catch (error) {
+    const refundRequested = await refundOrder({ env, orderId })
+
     return jsonResponse(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : isKoreanLocale(undefined)
-              ? '헤어스타일 추천을 생성하는 중 서버 오류가 발생했습니다.'
-              : 'A server error occurred while generating the hairstyle recommendation.',
+        error: error instanceof Error
+          ? refundRequested
+            ? `${error.message} ${
+                isKoreanLocale(preferredLocale)
+                  ? '결제가 자동 환불 처리되었습니다.'
+                  : 'The payment was refunded automatically.'
+              }`
+            : error.message
+          : isKoreanLocale(preferredLocale)
+            ? '헤어스타일 추천을 생성하는 중 서버 오류가 발생했습니다.'
+            : 'A server error occurred while generating the hairstyle recommendation.',
+        refundRequested,
       },
       500,
     )

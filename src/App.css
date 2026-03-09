@@ -574,6 +574,34 @@
   gap: 0.8rem;
 }
 
+.delivery-card {
+  gap: 0.8rem;
+}
+
+.delivery-target {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0.85rem 0.95rem;
+  border-radius: 1rem;
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  line-height: 1.55;
+}
+
+.delivery-target strong {
+  color: var(--text-strong);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.delivery-target span {
+  min-width: 0;
+  color: var(--text-body);
+  overflow-wrap: anywhere;
+}
+
 .report-action-group {
   display: grid;
   gap: 0.75rem;
@@ -882,6 +910,7 @@
   .status-message,
   .empty-state,
   .visual-caption,
+  .delivery-target,
   .policy-links-label,
   .policy-subtitle,
   .policy-meta,
@@ -908,6 +937,7 @@
   .utility-copy p,
   .status-message,
   .empty-state,
+  .delivery-target,
   .policy-links-label,
   .policy-subtitle
 ) {
