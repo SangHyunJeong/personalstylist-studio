@@ -1582,7 +1582,7 @@ function App() {
                 <div className="brand-badge">
                   <SparkleIcon className="brand-badge-icon" />
                 </div>
-                <span className="brand-name">STYLIS.</span>
+                <span className="brand-name">Personal AI Stylist</span>
               </div>
 
               <button
