@@ -28,6 +28,8 @@
   --button-end: #40536d;
   --error-bg: rgba(180, 56, 43, 0.08);
   --error-text: #9d2f22;
+  --fallback-bg: rgba(43, 95, 180, 0.1);
+  --fallback-text: #224f9b;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -58,6 +60,8 @@
   --button-end: #7aa0d8;
   --error-bg: rgba(183, 70, 58, 0.18);
   --error-text: #ffb1a6;
+  --fallback-bg: rgba(83, 121, 190, 0.18);
+  --fallback-text: #c4d9ff;
 }
 
 * {

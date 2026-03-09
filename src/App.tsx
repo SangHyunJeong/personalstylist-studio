@@ -13,9 +13,12 @@ type StyleReportResponse = {
 }
 
 type HairRecommendationResponse = {
-  imageBase64: string
-  mimeType: string
+  mode: 'image' | 'prompt'
+  imageBase64?: string
+  mimeType?: string
   description: string
+  prompt?: string
+  note?: string
   error?: string
 }
 
@@ -71,6 +74,8 @@ function App() {
   const [hairPhotoPreview, setHairPhotoPreview] = useState('')
   const [hairDescription, setHairDescription] = useState('')
   const [hairResultImage, setHairResultImage] = useState('')
+  const [hairPrompt, setHairPrompt] = useState('')
+  const [hairNote, setHairNote] = useState('')
   const [hairErrorMessage, setHairErrorMessage] = useState('')
   const [isHairLoading, setIsHairLoading] = useState(false)
   const [isHairDragging, setIsHairDragging] = useState(false)
@@ -279,6 +284,8 @@ function App() {
       setHairErrorMessage('')
       setHairDescription('')
       setHairResultImage('')
+      setHairPrompt('')
+      setHairNote('')
 
       const imageBase64 = await readFileAsBase64(hairPhotoFile)
 
@@ -296,12 +303,20 @@ function App() {
 
       const data = await parseResponseJson<HairRecommendationResponse>(response)
 
-      if (!response.ok || !data?.imageBase64 || !data.description) {
+      if (!response.ok || !data?.description) {
         throw new Error(data?.error ?? '헤어스타일 추천 이미지를 생성하지 못했습니다.')
       }
 
-      setHairResultImage(`data:${data.mimeType};base64,${data.imageBase64}`)
       setHairDescription(data.description)
+      setHairNote(data.note ?? '')
+
+      if (data.mode === 'image' && data.imageBase64 && data.mimeType) {
+        setHairResultImage(`data:${data.mimeType};base64,${data.imageBase64}`)
+      }
+
+      if (data.mode === 'prompt') {
+        setHairPrompt(data.prompt ?? data.description)
+      }
     } catch (error) {
       const fallback = '헤어스타일 추천 이미지를 가져오는 중 문제가 발생했습니다.'
       setHairErrorMessage(error instanceof Error ? error.message : fallback)
@@ -320,6 +335,19 @@ function App() {
 
       return <span key={`${segment}-${index}`}>{segment}</span>
     })
+  }
+
+  const copyHairPrompt = async () => {
+    if (!hairPrompt) {
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(hairPrompt)
+      setHairNote('프롬프트를 클립보드에 복사했습니다.')
+    } catch {
+      setHairNote('클립보드 복사에 실패했습니다. 직접 선택해서 복사해 주세요.')
+    }
   }
 
   const renderPhotoField = ({
@@ -592,6 +620,7 @@ function App() {
 
             {hairResultImage ? (
               <div className="hair-result">
+                {hairNote ? <p className="status-message fallback">{hairNote}</p> : null}
                 <img
                   alt="추천된 3x3 헤어스타일 그리드"
                   className="hair-result-image"
@@ -603,10 +632,29 @@ function App() {
                   ))}
                 </article>
               </div>
+            ) : hairPrompt ? (
+              <div className="hair-result">
+                {hairNote ? <p className="status-message fallback">{hairNote}</p> : null}
+                <div className="prompt-panel">
+                  <div className="prompt-header">
+                    <strong>외부 툴용 복사 프롬프트</strong>
+                    <button className="copy-button" onClick={copyHairPrompt} type="button">
+                      프롬프트 복사
+                    </button>
+                  </div>
+                  <pre className="prompt-box">{hairPrompt}</pre>
+                </div>
+                <article className="report-body">
+                  {hairDescription.split('\n').map((line, index) => (
+                    <p key={`${line}-${index}`}>{renderRichTextLine(line)}</p>
+                  ))}
+                </article>
+              </div>
             ) : (
               <div className="report-placeholder">
                 사진을 업로드한 뒤 추천을 생성하면, 얼굴은 유지한 3x3 헤어스타일
-                이미지와 스타일 설명이 여기에 표시됩니다.
+                이미지가 생성되거나, 외부 툴에 붙여넣을 수 있는 프롬프트가
+                여기에 표시됩니다.
               </div>
             )}
           </section>
