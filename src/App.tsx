@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import type {
   ChangeEvent,
   DragEvent,
-  ReactNode,
   FormEvent,
+  ReactNode,
 } from 'react'
 import './App.css'
 
@@ -12,7 +12,15 @@ type StyleReportResponse = {
   error?: string
 }
 
+type HairRecommendationResponse = {
+  imageBase64: string
+  mimeType: string
+  description: string
+  error?: string
+}
+
 type Theme = 'light' | 'dark'
+type View = 'home' | 'style' | 'hair'
 
 const getInitialTheme = (): Theme => {
   if (typeof window === 'undefined') {
@@ -30,17 +38,42 @@ const getInitialTheme = (): Theme => {
     : 'light'
 }
 
+const getInitialView = (): View => {
+  if (typeof window === 'undefined') {
+    return 'home'
+  }
+
+  const hash = window.location.hash.replace('#', '')
+
+  if (hash === 'style' || hash === 'hair') {
+    return hash
+  }
+
+  return 'home'
+}
+
 function App() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
+  const [view, setView] = useState<View>(getInitialView)
+
   const [height, setHeight] = useState('')
   const [weight, setWeight] = useState('')
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
-  const [photoName, setPhotoName] = useState('아직 선택된 사진이 없습니다')
-  const [photoPreview, setPhotoPreview] = useState('')
-  const [report, setReport] = useState('')
-  const [errorMessage, setErrorMessage] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [isDragging, setIsDragging] = useState(false)
+  const [stylePhotoFile, setStylePhotoFile] = useState<File | null>(null)
+  const [stylePhotoName, setStylePhotoName] = useState('아직 선택된 사진이 없습니다')
+  const [stylePhotoPreview, setStylePhotoPreview] = useState('')
+  const [styleReport, setStyleReport] = useState('')
+  const [styleErrorMessage, setStyleErrorMessage] = useState('')
+  const [isStyleLoading, setIsStyleLoading] = useState(false)
+  const [isStyleDragging, setIsStyleDragging] = useState(false)
+
+  const [hairPhotoFile, setHairPhotoFile] = useState<File | null>(null)
+  const [hairPhotoName, setHairPhotoName] = useState('아직 선택된 사진이 없습니다')
+  const [hairPhotoPreview, setHairPhotoPreview] = useState('')
+  const [hairDescription, setHairDescription] = useState('')
+  const [hairResultImage, setHairResultImage] = useState('')
+  const [hairErrorMessage, setHairErrorMessage] = useState('')
+  const [isHairLoading, setIsHairLoading] = useState(false)
+  const [isHairDragging, setIsHairDragging] = useState(false)
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -48,64 +81,41 @@ function App() {
   }, [theme])
 
   useEffect(() => {
+    const handleHashChange = () => {
+      setView(getInitialView())
+    }
+
+    window.addEventListener('hashchange', handleHashChange)
+
     return () => {
-      if (photoPreview) {
-        URL.revokeObjectURL(photoPreview)
+      window.removeEventListener('hashchange', handleHashChange)
+    }
+  }, [])
+
+  useEffect(() => {
+    const hash = view === 'home' ? '' : `#${view}`
+    const url = `${window.location.pathname}${window.location.search}${hash}`
+    window.history.replaceState(null, '', url)
+  }, [view])
+
+  useEffect(() => {
+    return () => {
+      if (stylePhotoPreview) {
+        URL.revokeObjectURL(stylePhotoPreview)
       }
     }
-  }, [photoPreview])
+  }, [stylePhotoPreview])
 
-  const resetPhoto = () => {
-    setPhotoFile(null)
-    setPhotoName('아직 선택된 사진이 없습니다')
-
-    if (photoPreview) {
-      URL.revokeObjectURL(photoPreview)
+  useEffect(() => {
+    return () => {
+      if (hairPhotoPreview) {
+        URL.revokeObjectURL(hairPhotoPreview)
+      }
     }
+  }, [hairPhotoPreview])
 
-    setPhotoPreview('')
-  }
-
-  const applySelectedPhoto = (file: File | null) => {
-    if (!file) {
-      resetPhoto()
-      return
-    }
-
-    if (!file.type.startsWith('image/')) {
-      setErrorMessage('이미지 파일만 업로드할 수 있습니다.')
-      return
-    }
-
-    if (photoPreview) {
-      URL.revokeObjectURL(photoPreview)
-    }
-
-    setPhotoFile(file)
-    setPhotoName(file.name)
-    setPhotoPreview(URL.createObjectURL(file))
-    setErrorMessage('')
-  }
-
-  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
-    applySelectedPhoto(event.target.files?.[0] ?? null)
-  }
-
-  const handleDragOver = (event: DragEvent<HTMLLabelElement>) => {
-    event.preventDefault()
-    setIsDragging(true)
-  }
-
-  const handleDragLeave = (event: DragEvent<HTMLLabelElement>) => {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-      setIsDragging(false)
-    }
-  }
-
-  const handleDrop = (event: DragEvent<HTMLLabelElement>) => {
-    event.preventDefault()
-    setIsDragging(false)
-    applySelectedPhoto(event.dataTransfer.files?.[0] ?? null)
+  const toggleTheme = () => {
+    setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))
   }
 
   const readFileAsBase64 = (file: File) =>
@@ -137,7 +147,7 @@ function App() {
       reader.readAsDataURL(file)
     })
 
-  const parseResponseJson = async (response: Response) => {
+  const parseResponseJson = async <T,>(response: Response) => {
     const rawText = await response.text()
 
     if (!rawText.trim()) {
@@ -145,31 +155,87 @@ function App() {
     }
 
     try {
-      return JSON.parse(rawText) as StyleReportResponse
+      return JSON.parse(rawText) as T
     } catch {
       throw new Error('서버 응답을 해석하지 못했습니다.')
     }
   }
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const updateStylePhoto = (file: File | null) => {
+    if (!file) {
+      setStylePhotoFile(null)
+      setStylePhotoName('아직 선택된 사진이 없습니다')
+
+      if (stylePhotoPreview) {
+        URL.revokeObjectURL(stylePhotoPreview)
+      }
+
+      setStylePhotoPreview('')
+      return
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setStyleErrorMessage('이미지 파일만 업로드할 수 있습니다.')
+      return
+    }
+
+    if (stylePhotoPreview) {
+      URL.revokeObjectURL(stylePhotoPreview)
+    }
+
+    setStylePhotoFile(file)
+    setStylePhotoName(file.name)
+    setStylePhotoPreview(URL.createObjectURL(file))
+    setStyleErrorMessage('')
+  }
+
+  const updateHairPhoto = (file: File | null) => {
+    if (!file) {
+      setHairPhotoFile(null)
+      setHairPhotoName('아직 선택된 사진이 없습니다')
+
+      if (hairPhotoPreview) {
+        URL.revokeObjectURL(hairPhotoPreview)
+      }
+
+      setHairPhotoPreview('')
+      return
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setHairErrorMessage('이미지 파일만 업로드할 수 있습니다.')
+      return
+    }
+
+    if (hairPhotoPreview) {
+      URL.revokeObjectURL(hairPhotoPreview)
+    }
+
+    setHairPhotoFile(file)
+    setHairPhotoName(file.name)
+    setHairPhotoPreview(URL.createObjectURL(file))
+    setHairErrorMessage('')
+  }
+
+  const handleStyleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!photoFile) {
-      setErrorMessage('스타일 분석을 위해 본인 사진을 업로드해 주세요.')
+    if (!stylePhotoFile) {
+      setStyleErrorMessage('스타일 분석을 위해 본인 사진을 업로드해 주세요.')
       return
     }
 
     if (!height.trim() || !weight.trim()) {
-      setErrorMessage('키와 몸무게를 모두 입력해 주세요.')
+      setStyleErrorMessage('키와 몸무게를 모두 입력해 주세요.')
       return
     }
 
     try {
-      setIsLoading(true)
-      setErrorMessage('')
-      setReport('')
+      setIsStyleLoading(true)
+      setStyleErrorMessage('')
+      setStyleReport('')
 
-      const imageBase64 = await readFileAsBase64(photoFile)
+      const imageBase64 = await readFileAsBase64(stylePhotoFile)
 
       const response = await fetch('/api/style-report', {
         method: 'POST',
@@ -180,31 +246,71 @@ function App() {
           height,
           weight,
           imageBase64,
-          mimeType: photoFile.type || 'image/jpeg',
+          mimeType: stylePhotoFile.type || 'image/jpeg',
           preferredLocale: navigator.language || 'en-US',
         }),
       })
 
-      const data = await parseResponseJson(response)
+      const data = await parseResponseJson<StyleReportResponse>(response)
 
       if (!response.ok || !data?.report) {
         throw new Error(data?.error ?? '스타일 보고서를 생성하지 못했습니다.')
       }
 
-      setReport(data.report)
+      setStyleReport(data.report)
     } catch (error) {
       const fallback = '스타일 보고서를 가져오는 중 문제가 발생했습니다.'
-      setErrorMessage(error instanceof Error ? error.message : fallback)
+      setStyleErrorMessage(error instanceof Error ? error.message : fallback)
     } finally {
-      setIsLoading(false)
+      setIsStyleLoading(false)
     }
   }
 
-  const toggleTheme = () => {
-    setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))
+  const handleHairSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!hairPhotoFile) {
+      setHairErrorMessage('헤어스타일 추천을 위해 본인 사진을 업로드해 주세요.')
+      return
+    }
+
+    try {
+      setIsHairLoading(true)
+      setHairErrorMessage('')
+      setHairDescription('')
+      setHairResultImage('')
+
+      const imageBase64 = await readFileAsBase64(hairPhotoFile)
+
+      const response = await fetch('/api/hairstyle-grid', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageBase64,
+          mimeType: hairPhotoFile.type || 'image/jpeg',
+          preferredLocale: navigator.language || 'en-US',
+        }),
+      })
+
+      const data = await parseResponseJson<HairRecommendationResponse>(response)
+
+      if (!response.ok || !data?.imageBase64 || !data.description) {
+        throw new Error(data?.error ?? '헤어스타일 추천 이미지를 생성하지 못했습니다.')
+      }
+
+      setHairResultImage(`data:${data.mimeType};base64,${data.imageBase64}`)
+      setHairDescription(data.description)
+    } catch (error) {
+      const fallback = '헤어스타일 추천 이미지를 가져오는 중 문제가 발생했습니다.'
+      setHairErrorMessage(error instanceof Error ? error.message : fallback)
+    } finally {
+      setIsHairLoading(false)
+    }
   }
 
-  const renderReportLine = (line: string) => {
+  const renderRichTextLine = (line: string) => {
     const segments = line.split(/(\*\*.*?\*\*)/g).filter(Boolean)
 
     return segments.map((segment, index): ReactNode => {
@@ -216,126 +322,296 @@ function App() {
     })
   }
 
+  const renderPhotoField = ({
+    label,
+    isDragging,
+    preview,
+    name,
+    onChange,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+  }: {
+    label: string
+    isDragging: boolean
+    preview: string
+    name: string
+    onChange: (event: ChangeEvent<HTMLInputElement>) => void
+    onDragOver: (event: DragEvent<HTMLLabelElement>) => void
+    onDragLeave: (event: DragEvent<HTMLLabelElement>) => void
+    onDrop: (event: DragEvent<HTMLLabelElement>) => void
+  }) => (
+    <label
+      className={`photo-field ${isDragging ? 'is-dragging' : ''}`}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
+      <span className="field-label">{label}</span>
+      <input
+        accept="image/*"
+        className="photo-input"
+        onChange={onChange}
+        type="file"
+      />
+
+      <div className="photo-dropzone">
+        {preview ? (
+          <img
+            alt="업로드한 프로필 미리보기"
+            className="photo-preview"
+            src={preview}
+          />
+        ) : (
+          <div className="photo-placeholder">
+            <strong>사진을 끌어다 놓거나 클릭해서 업로드하세요</strong>
+            <p>정면 전신 또는 상반신 사진이면 더 정확한 추천이 가능합니다.</p>
+          </div>
+        )}
+      </div>
+
+      <span className="photo-name">{name}</span>
+    </label>
+  )
+
   return (
     <main className="app-shell">
       <section className="hero-panel">
         <div className="hero-topbar">
-          <p className="eyebrow">PERSONAL STYLIST</p>
+          <div className="hero-actions">
+            {view !== 'home' ? (
+              <button
+                className="back-button"
+                onClick={() => setView('home')}
+                type="button"
+              >
+                홈으로
+              </button>
+            ) : null}
+            <p className="eyebrow">PERSONAL STYLIST</p>
+          </div>
+
           <button className="theme-toggle" onClick={toggleTheme} type="button">
             {theme === 'dark' ? '라이트 모드' : '다크 모드'}
           </button>
         </div>
 
-        <h1>내 체형에 맞는 스타일 제안을 시작해보세요.</h1>
-        <p className="hero-copy">
-          사진 한 장과 기본 신체 정보를 입력하면, AI 스타일리스트가 실루엣,
-          핏, 추천 아이템 중심으로 개인화된 스타일 컨설팅 보고서를 제공합니다.
-        </p>
+        {view === 'home' ? (
+          <>
+            <h1>어떤 스타일 추천을 받을지 먼저 선택하세요.</h1>
+            <p className="hero-copy">
+              체형 기반 코디 추천과 헤어스타일링 추천을 분리해서, 같은 사진으로도
+              다른 방향의 스타일 컨설팅을 받을 수 있게 구성했습니다.
+            </p>
 
-        <div className="hero-card">
-          <span>추천 흐름</span>
-          <strong>사진 업로드</strong>
-          <strong>체형 정보 입력</strong>
-          <strong>스타일 보고서 받기</strong>
-        </div>
-      </section>
+            <div className="mode-grid">
+              <button
+                className="mode-card"
+                onClick={() => setView('style')}
+                type="button"
+              >
+                <span>1</span>
+                <strong>체형에 맞는 스타일 제안</strong>
+                <p>사진, 키, 몸무게를 바탕으로 코디와 핏 중심의 보고서를 생성합니다.</p>
+              </button>
 
-      <section className="content-panel">
-        <div className="form-header">
-          <p>스타일 프로필 만들기</p>
-          <h2>기본 정보 입력</h2>
-        </div>
-
-        <form className="profile-form" onSubmit={handleSubmit}>
-          <label
-            className={`photo-field ${isDragging ? 'is-dragging' : ''}`}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-          >
-            <span className="field-label">본인 사진</span>
-            <input
-              accept="image/*"
-              className="photo-input"
-              onChange={handlePhotoChange}
-              type="file"
-            />
-
-            <div className="photo-dropzone">
-              {photoPreview ? (
-                <img
-                  alt="업로드한 프로필 미리보기"
-                  className="photo-preview"
-                  src={photoPreview}
-                />
-              ) : (
-                <div className="photo-placeholder">
-                  <strong>사진을 끌어다 놓거나 클릭해서 업로드하세요</strong>
-                  <p>정면 전신 또는 상반신 사진이면 더 정확한 추천이 가능합니다.</p>
-                </div>
-              )}
+              <button
+                className="mode-card"
+                onClick={() => setView('hair')}
+                type="button"
+              >
+                <span>2</span>
+                <strong>헤어스타일링 추천</strong>
+                <p>사진 속 얼굴은 유지한 채, 잘 어울리는 헤어스타일 9가지를 3x3 그리드로 생성합니다.</p>
+              </button>
             </div>
-
-            <span className="photo-name">{photoName}</span>
-          </label>
-
-          <div className="metrics-grid">
-            <label className="input-field">
-              <span className="field-label">키</span>
-              <div className="input-wrap">
-                <input
-                  inputMode="decimal"
-                  onChange={(event) => setHeight(event.target.value)}
-                  placeholder="예: 170"
-                  type="text"
-                  value={height}
-                />
-                <span>cm</span>
-              </div>
-            </label>
-
-            <label className="input-field">
-              <span className="field-label">몸무게</span>
-              <div className="input-wrap">
-                <input
-                  inputMode="decimal"
-                  onChange={(event) => setWeight(event.target.value)}
-                  placeholder="예: 70"
-                  type="text"
-                  value={weight}
-                />
-                <span>kg</span>
-              </div>
-            </label>
-          </div>
-
-          {errorMessage ? <p className="status-message error">{errorMessage}</p> : null}
-
-          <button className="submit-button" disabled={isLoading} type="submit">
-            {isLoading ? '스타일 보고서 생성 중...' : '스타일 추천 시작하기'}
-          </button>
-        </form>
-      </section>
-
-      <section className="report-panel">
-        <div className="report-header">
-          <p>AI Style Report</p>
-          <h3>스타일 컨설팅 보고서</h3>
-        </div>
-
-        {report ? (
-          <article className="report-body">
-            {report.split('\n').map((line, index) => (
-              <p key={`${line}-${index}`}>{renderReportLine(line)}</p>
-            ))}
-          </article>
+          </>
+        ) : view === 'style' ? (
+          <>
+            <h1>체형에 맞는 스타일 보고서를 생성해보세요.</h1>
+            <p className="hero-copy">
+              체형 정보와 얼굴 인상을 함께 참고해, 옷의 핏과 실루엣, 코디 방향을
+              텍스트 보고서로 정리해드립니다.
+            </p>
+          </>
         ) : (
-          <div className="report-placeholder">
-            사진과 체형 정보를 입력한 뒤 보고서를 생성하면, 실루엣 분석과 추천
-            룩 방향이 여기에 표시됩니다.
-          </div>
+          <>
+            <h1>얼굴은 그대로, 헤어스타일만 바꿔서 추천받아보세요.</h1>
+            <p className="hero-copy">
+              AI 헤어스타일리스트가 첨부한 사진 속 인물의 얼굴을 유지한 채, 가장
+              잘 어울리는 헤어스타일 9개를 3x3 그리드 이미지로 생성합니다.
+            </p>
+          </>
         )}
       </section>
+
+      {view === 'style' ? (
+        <>
+          <section className="content-panel">
+            <div className="form-header">
+              <p>Style Report</p>
+              <h2>기본 정보 입력</h2>
+            </div>
+
+            <form className="profile-form" onSubmit={handleStyleSubmit}>
+              {renderPhotoField({
+                label: '본인 사진',
+                isDragging: isStyleDragging,
+                preview: stylePhotoPreview,
+                name: stylePhotoName,
+                onChange: (event) => updateStylePhoto(event.target.files?.[0] ?? null),
+                onDragOver: (event) => {
+                  event.preventDefault()
+                  setIsStyleDragging(true)
+                },
+                onDragLeave: (event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    setIsStyleDragging(false)
+                  }
+                },
+                onDrop: (event) => {
+                  event.preventDefault()
+                  setIsStyleDragging(false)
+                  updateStylePhoto(event.dataTransfer.files?.[0] ?? null)
+                },
+              })}
+
+              <div className="metrics-grid">
+                <label className="input-field">
+                  <span className="field-label">키</span>
+                  <div className="input-wrap">
+                    <input
+                      inputMode="decimal"
+                      onChange={(event) => setHeight(event.target.value)}
+                      placeholder="예: 170"
+                      type="text"
+                      value={height}
+                    />
+                    <span>cm</span>
+                  </div>
+                </label>
+
+                <label className="input-field">
+                  <span className="field-label">몸무게</span>
+                  <div className="input-wrap">
+                    <input
+                      inputMode="decimal"
+                      onChange={(event) => setWeight(event.target.value)}
+                      placeholder="예: 70"
+                      type="text"
+                      value={weight}
+                    />
+                    <span>kg</span>
+                  </div>
+                </label>
+              </div>
+
+              {styleErrorMessage ? (
+                <p className="status-message error">{styleErrorMessage}</p>
+              ) : null}
+
+              <button className="submit-button" disabled={isStyleLoading} type="submit">
+                {isStyleLoading ? '스타일 보고서 생성 중...' : '체형 스타일 추천받기'}
+              </button>
+            </form>
+          </section>
+
+          <section className="report-panel">
+            <div className="report-header">
+              <p>AI Style Report</p>
+              <h3>스타일 컨설팅 보고서</h3>
+            </div>
+
+            {styleReport ? (
+              <article className="report-body">
+                {styleReport.split('\n').map((line, index) => (
+                  <p key={`${line}-${index}`}>{renderRichTextLine(line)}</p>
+                ))}
+              </article>
+            ) : (
+              <div className="report-placeholder">
+                사진과 체형 정보를 입력한 뒤 보고서를 생성하면, 실루엣 분석과 추천
+                룩 방향이 여기에 표시됩니다.
+              </div>
+            )}
+          </section>
+        </>
+      ) : null}
+
+      {view === 'hair' ? (
+        <>
+          <section className="content-panel">
+            <div className="form-header">
+              <p>Hair Styling</p>
+              <h2>헤어스타일링 추천</h2>
+            </div>
+
+            <p className="section-copy">
+              업로드한 사진 속 얼굴은 유지한 채, 가장 잘 어울리는 헤어스타일 9개를
+              3x3 그리드 이미지와 설명으로 생성합니다.
+            </p>
+
+            <form className="profile-form" onSubmit={handleHairSubmit}>
+              {renderPhotoField({
+                label: '헤어스타일링용 사진',
+                isDragging: isHairDragging,
+                preview: hairPhotoPreview,
+                name: hairPhotoName,
+                onChange: (event) => updateHairPhoto(event.target.files?.[0] ?? null),
+                onDragOver: (event) => {
+                  event.preventDefault()
+                  setIsHairDragging(true)
+                },
+                onDragLeave: (event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    setIsHairDragging(false)
+                  }
+                },
+                onDrop: (event) => {
+                  event.preventDefault()
+                  setIsHairDragging(false)
+                  updateHairPhoto(event.dataTransfer.files?.[0] ?? null)
+                },
+              })}
+
+              {hairErrorMessage ? (
+                <p className="status-message error">{hairErrorMessage}</p>
+              ) : null}
+
+              <button className="submit-button" disabled={isHairLoading} type="submit">
+                {isHairLoading ? '헤어스타일 추천 생성 중...' : '헤어스타일 추천받기'}
+              </button>
+            </form>
+          </section>
+
+          <section className="report-panel">
+            <div className="report-header">
+              <p>AI Hair Stylist</p>
+              <h3>3x3 헤어스타일 추천</h3>
+            </div>
+
+            {hairResultImage ? (
+              <div className="hair-result">
+                <img
+                  alt="추천된 3x3 헤어스타일 그리드"
+                  className="hair-result-image"
+                  src={hairResultImage}
+                />
+                <article className="report-body">
+                  {hairDescription.split('\n').map((line, index) => (
+                    <p key={`${line}-${index}`}>{renderRichTextLine(line)}</p>
+                  ))}
+                </article>
+              </div>
+            ) : (
+              <div className="report-placeholder">
+                사진을 업로드한 뒤 추천을 생성하면, 얼굴은 유지한 3x3 헤어스타일
+                이미지와 스타일 설명이 여기에 표시됩니다.
+              </div>
+            )}
+          </section>
+        </>
+      ) : null}
     </main>
   )
 }
