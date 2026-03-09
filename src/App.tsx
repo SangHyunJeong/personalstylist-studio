@@ -27,6 +27,11 @@ type HairRecommendationResponse = {
   error?: string
 }
 
+type CheckoutResponse = {
+  url?: string
+  error?: string
+}
+
 type Theme = 'light' | 'dark'
 type Language = 'ko' | 'en'
 type View = 'home' | 'style' | 'hair'
@@ -151,6 +156,12 @@ const localeCopy = {
       'ChatGPT, Gemini 또는 다른 이미지 생성 도구에서 다시 시도할 수 있도록 프롬프트를 복사합니다.',
     utilityButton: '내 생성형 AI로 가져가서 이미지 생성할 프롬프트 복사하기',
     recommendedVisual: '추천 스타일 비주얼',
+    checkoutTitle: '디지털 액세스 구매',
+    checkoutDescription:
+      'Polar 결제로 이 AI 스타일링 소프트웨어의 디지털 액세스를 구매합니다. 오프라인 서비스나 실물 상품은 포함되지 않습니다.',
+    checkoutButton: 'Polar로 결제하기',
+    checkoutLoading: '결제 페이지 준비 중...',
+    checkoutError: '결제 페이지를 시작하지 못했습니다.',
     navHome: 'HOME',
     navStylist: 'STYLIST',
     navGallery: 'REPORTS',
@@ -223,6 +234,12 @@ const localeCopy = {
       'Copy an optimized prompt to try the hairstyle generation again in ChatGPT, Gemini, or another image tool.',
     utilityButton: 'Copy prompt for image generation in my AI',
     recommendedVisual: 'Recommended Style Visual',
+    checkoutTitle: 'Purchase Digital Access',
+    checkoutDescription:
+      'Use Polar checkout to purchase digital access to this AI styling software. No offline service or physical goods are included.',
+    checkoutButton: 'Pay with Polar',
+    checkoutLoading: 'Preparing checkout...',
+    checkoutError: 'Unable to start the checkout flow.',
     navHome: 'HOME',
     navStylist: 'STYLIST',
     navGallery: 'REPORTS',
@@ -462,6 +479,8 @@ function App() {
   const [hairErrorMessage, setHairErrorMessage] = useState('')
   const [isHairLoading, setIsHairLoading] = useState(false)
   const [isHairDragging, setIsHairDragging] = useState(false)
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false)
+  const [checkoutErrorMessage, setCheckoutErrorMessage] = useState('')
   const copy = localeCopy[language]
   const preferredLocale = language === 'ko' ? 'ko-KR' : 'en-US'
 
@@ -804,6 +823,37 @@ function App() {
     await copyText(hairPrompt, setHairCopyMessage, setHairCopyMessage)
   }
 
+  const startCheckout = async () => {
+    try {
+      setIsCheckoutLoading(true)
+      setCheckoutErrorMessage('')
+
+      const response = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          preferredLocale,
+          currentUrl: window.location.href,
+        }),
+      })
+
+      const data = await parseResponseJson<CheckoutResponse>(response)
+
+      if (!response.ok || !data?.url) {
+        throw new Error(data?.error ?? copy.checkoutError)
+      }
+
+      window.location.href = data.url
+    } catch (error) {
+      setCheckoutErrorMessage(
+        error instanceof Error ? error.message : copy.checkoutError,
+      )
+      setIsCheckoutLoading(false)
+    }
+  }
+
   const activeNav = view === 'style'
     ? 'gallery'
     : view === 'hair'
@@ -906,6 +956,32 @@ function App() {
       </section>
     )
   }
+
+  const renderCheckoutCard = () => (
+    <section className="utility-card checkout-card">
+      <div className="utility-copy">
+        <div className="utility-icon">
+          <SparkleIcon className="utility-icon-svg" />
+        </div>
+        <div>
+          <h4>{copy.checkoutTitle}</h4>
+          <p>{copy.checkoutDescription}</p>
+        </div>
+      </div>
+      {checkoutErrorMessage ? (
+        <p className="status-message error">{checkoutErrorMessage}</p>
+      ) : null}
+      <button
+        className="utility-button checkout-button"
+        disabled={isCheckoutLoading}
+        onClick={startCheckout}
+        type="button"
+      >
+        <SparkleIcon className="button-icon" />
+        <span>{isCheckoutLoading ? copy.checkoutLoading : copy.checkoutButton}</span>
+      </button>
+    </section>
+  )
 
   return (
     <div className="app-frame">
@@ -1045,6 +1121,8 @@ function App() {
                   </div>
                 </button>
               </section>
+
+              {renderCheckoutCard()}
             </>
           ) : null}
 
@@ -1159,6 +1237,8 @@ function App() {
                 copyMessage: styleCopyMessage,
                 onCopy: copyStylePrompt,
               })}
+
+              {renderCheckoutCard()}
             </>
           ) : null}
 
@@ -1245,6 +1325,8 @@ function App() {
                 copyMessage: hairCopyMessage,
                 onCopy: copyHairPrompt,
               })}
+
+              {renderCheckoutCard()}
             </>
           ) : null}
         </main>

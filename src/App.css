@@ -636,6 +636,19 @@
   color: var(--utility-button-text);
 }
 
+.utility-button:disabled {
+  opacity: 0.7;
+}
+
+.checkout-card {
+  border-style: solid;
+}
+
+.checkout-button {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
 .button-icon {
   width: 1rem;
   height: 1rem;
