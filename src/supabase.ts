@@ -7,7 +7,22 @@ const supabasePublishableKey =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ||
   import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
 
-export const hasSupabaseConfig = Boolean(supabaseUrl && supabasePublishableKey)
+const isValidHttpUrl = (value?: string) => {
+  if (!value) {
+    return false
+  }
+
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+export const hasSupabaseConfig = Boolean(
+  isValidHttpUrl(supabaseUrl) && supabasePublishableKey,
+)
 
 export const getSupabaseClient = () => {
   if (!hasSupabaseConfig) {
