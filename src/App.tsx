@@ -77,7 +77,7 @@ type Theme = 'light' | 'dark'
 type Language = 'ko' | 'en'
 type AuthMode = 'sign-in' | 'sign-up'
 type StatusTone = 'success' | 'error' | 'fallback'
-type View = 'home' | 'style' | 'hair' | 'billing' | LegalView
+type View = 'home' | 'style' | 'hair' | 'account' | LegalView
 
 const homeStyleImage =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuDQjx-vParhC1dothBqJzuH356lz73-3ubERqUoT5vD7PVP-6JWbDUJOmUiF7xHQu1a3AvUMNrHW-RYaRmRSLlWsZejfRc9IkyHIB5x0r7TScYE-OT3lXUhRyl5r37cDOMlynoU9NXuA65unD52y31OY7Q-ni6AFAwrRSWbYU98PSLxaWZvysgx72USxcVwLNYX3C9CaPR5qmcmow2iAt1Eupi0iZPhBPUyf8z_xepgOug3zcHgSv_QMSD1qZRtUY9T5DSq1mVQrS0P'
@@ -135,12 +135,16 @@ const getInitialView = (): View => {
   if (
     hash === 'style' ||
     hash === 'hair' ||
-    hash === 'billing' ||
+    hash === 'account' ||
     hash === 'terms' ||
     hash === 'refunds' ||
     hash === 'privacy'
   ) {
     return hash
+  }
+
+  if (hash === 'billing') {
+    return 'account'
   }
 
   return 'home'
@@ -252,6 +256,8 @@ const localeCopy = {
     homeStyleDescription:
       '체형과 인상을 바탕으로 실루엣, 코디, 아이템을 자동 정리한 디지털 스타일 보고서를 생성합니다.',
     homeStyleCta: '분석 시작하기',
+    homeAccountShortcutSignedOut: '로그인',
+    homeAccountShortcutSignedIn: '내 계정',
     homeHairTitle: '헤어스타일링 추천',
     homeHairDescription:
       '얼굴은 그대로 유지한 채, 잘 어울리는 헤어스타일 9가지를 3x3 이미지로 추천합니다.',
@@ -293,7 +299,7 @@ const localeCopy = {
       'ChatGPT, Gemini 또는 다른 이미지 생성 도구에서 다시 시도할 수 있도록 프롬프트를 복사합니다.',
     utilityButton: '내 생성형 AI로 가져가서 이미지 생성할 프롬프트 복사하기',
     recommendedVisual: '추천 스타일 비주얼',
-    topbarBilling: '결제 및 액세스',
+    topbarAccount: '계정 및 액세스',
     checkoutTitle: '디지털 액세스 구매',
     checkoutDescription:
       'Polar 결제로 이 AI 스타일링 소프트웨어의 디지털 액세스를 구매합니다. 오프라인 서비스나 실물 상품은 포함되지 않습니다.',
@@ -306,10 +312,10 @@ const localeCopy = {
     checkoutVerifiedStatus: '이 기기에서는 결제 확인이 완료되어 두 생성 흐름을 바로 사용할 수 있습니다.',
     checkoutPendingStatus:
       '결제 세션이 대기 중입니다. 결제를 마친 뒤 이 페이지로 돌아오면 상태가 갱신됩니다.',
-    checkoutPageTag: 'BILLING',
-    checkoutPageTitle: '결제 후 자동으로 생성이 이어집니다',
-    checkoutPageBody:
-      '사진과 정보를 먼저 입력한 뒤 생성 버튼을 누르면 Polar checkout으로 이동합니다. 결제가 확인되면 방금 입력한 내용으로 스타일 결과를 자동 생성합니다.',
+    accountPageTag: 'ACCOUNT',
+    accountPageTitle: '계정과 디지털 액세스를 관리하세요',
+    accountPageBody:
+      '여기에서 회원가입 또는 로그인을 하고, 같은 계정으로 Polar 결제를 완료한 뒤 스타일 생성과 결과 이메일 전송을 이어서 사용할 수 있습니다.',
     checkoutError: '결제 페이지를 시작하지 못했습니다.',
     checkoutVerifiedTitle: '결제 확인 완료',
     checkoutVerifiedBody:
@@ -320,7 +326,7 @@ const localeCopy = {
     navHome: 'HOME',
     navStyle: 'STYLE',
     navHair: 'HAIR',
-    navBilling: 'BILLING',
+    navAccount: 'ACCOUNT',
     legalTag: 'LEGAL',
     legalLinksTitle: '약관 및 정책',
     legalLinksDescription: '서비스 약관, 환불 규정, 개인정보 처리방침',
@@ -406,6 +412,8 @@ const localeCopy = {
     homeStyleDescription:
       'Generate an automated digital report on silhouettes, outfit direction, and shopping ideas based on your proportions and impression.',
     homeStyleCta: 'Start Analysis',
+    homeAccountShortcutSignedOut: 'Sign In',
+    homeAccountShortcutSignedIn: 'Account',
     homeHairTitle: 'Hairstyling Recommendation',
     homeHairDescription:
       'Keep your face unchanged and generate 9 hairstyle ideas as a 3x3 image recommendation.',
@@ -447,7 +455,7 @@ const localeCopy = {
       'Copy an optimized prompt to try the hairstyle generation again in ChatGPT, Gemini, or another image tool.',
     utilityButton: 'Copy prompt for image generation in my AI',
     recommendedVisual: 'Recommended Style Visual',
-    topbarBilling: 'Billing & Access',
+    topbarAccount: 'Account & Access',
     checkoutTitle: 'Purchase Digital Access',
     checkoutDescription:
       'Use Polar checkout to purchase digital access to this AI styling software. No offline service or physical goods are included.',
@@ -461,10 +469,10 @@ const localeCopy = {
       'Payment is already verified on this device, so both generation flows can start immediately.',
     checkoutPendingStatus:
       'A checkout session is still pending. Return here after payment and the status will refresh.',
-    checkoutPageTag: 'BILLING',
-    checkoutPageTitle: 'Pay once, then continue automatically',
-    checkoutPageBody:
-      'Users can fill in their photo and details first, then tap generate to open Polar checkout. After payment is verified, the app resumes the requested style generation automatically.',
+    accountPageTag: 'ACCOUNT',
+    accountPageTitle: 'Manage your account and digital access',
+    accountPageBody:
+      'Sign up or sign in here, then use the same account for Polar checkout, generation, and result delivery.',
     checkoutError: 'Unable to start the checkout flow.',
     checkoutVerifiedTitle: 'Payment verified',
     checkoutVerifiedBody:
@@ -475,7 +483,7 @@ const localeCopy = {
     navHome: 'HOME',
     navStyle: 'STYLE',
     navHair: 'HAIR',
-    navBilling: 'BILLING',
+    navAccount: 'ACCOUNT',
     legalTag: 'LEGAL',
     legalLinksTitle: 'Terms and policies',
     legalLinksDescription: 'Terms of Service, Refund Policy, Privacy Policy',
@@ -686,7 +694,7 @@ const navItems = [
   { key: 'home', icon: HomeIcon },
   { key: 'style', icon: AnalyticsIcon },
   { key: 'hair', icon: ScissorsIcon },
-  { key: 'billing', icon: PersonIcon },
+  { key: 'account', icon: PersonIcon },
 ] as const
 
 const policyViews: LegalView[] = ['terms', 'refunds', 'privacy']
@@ -854,7 +862,7 @@ function App() {
     setCheckoutErrorMessage('')
 
     if (view === 'style' || view === 'hair') {
-      setView('home')
+      setView('account')
     }
   }, [isAuthLoading, isAuthenticated, view])
 
@@ -1176,7 +1184,7 @@ function App() {
       setAuthPassword('')
       setAuthPasswordConfirm('')
       await supabaseClient.auth.signOut()
-      setView('home')
+      setView('account')
       setAuthMode('sign-in')
     } catch (error) {
       setAuthFeedback(
@@ -1465,7 +1473,7 @@ function App() {
 
     if (!isAuthenticated) {
       setAuthFeedback('error', copy.authSessionRequired)
-      setView('home')
+      setView('account')
       return
     }
 
@@ -1510,7 +1518,7 @@ function App() {
 
     if (!isAuthenticated) {
       setAuthFeedback('error', copy.authSessionRequired)
-      setView('home')
+      setView('account')
       return
     }
 
@@ -1841,19 +1849,19 @@ function App() {
 
     if (!hasAuthConfig) {
       setAuthFeedback('error', copy.authConfigMissing)
-      setView('home')
+      setView('account')
       return
     }
 
     if (isAuthLoading) {
       setAuthFeedback('fallback', copy.authLoading)
-      setView('home')
+      setView('account')
       return
     }
 
     if (!isAuthenticated) {
       setAuthFeedback('error', copy.authSessionRequired)
-      setView('home')
+      setView('account')
       return
     }
 
@@ -1870,19 +1878,19 @@ function App() {
   const startCheckout = async () => {
     if (!hasAuthConfig) {
       setAuthFeedback('error', copy.authConfigMissing)
-      setView('home')
+      setView('account')
       return
     }
 
     if (isAuthLoading) {
       setAuthFeedback('fallback', copy.authLoading)
-      setView('home')
+      setView('account')
       return
     }
 
     if (!isAuthenticated) {
       setAuthFeedback('error', copy.authCheckoutRequired)
-      setView('home')
+      setView('account')
       return
     }
 
@@ -2010,7 +2018,7 @@ function App() {
     preferredLocale,
   ])
 
-  const activeNav = isPolicyView(view) ? 'billing' : view
+  const activeNav = isPolicyView(view) ? 'account' : view
   const currentPolicy = isPolicyView(view) ? policyCopy[view] : null
 
   const renderPhotoField = ({
@@ -2326,15 +2334,17 @@ function App() {
     )
   }
 
-  const renderBillingPage = () => (
+  const renderAccountPage = () => (
     <>
+      {renderAuthCard()}
+
       <section className="panel report-card">
         <div className="report-card-header">
-          <span className="panel-tag">{copy.checkoutPageTag}</span>
-          <h3>{copy.checkoutPageTitle}</h3>
+          <span className="panel-tag">{copy.accountPageTag}</span>
+          <h3>{copy.accountPageTitle}</h3>
         </div>
         <div className="rich-content">
-          <p className="rich-paragraph">{copy.checkoutPageBody}</p>
+          <p className="rich-paragraph">{copy.accountPageBody}</p>
           <div className="billing-status-card">
             <strong>{copy.checkoutStatusLabel}</strong>
             <p className="rich-paragraph">
@@ -2550,7 +2560,7 @@ function App() {
                     ? copy.topbarStyle
                     : view === 'hair'
                       ? copy.topbarHair
-                      : copy.topbarBilling)}
+                      : copy.topbarAccount)}
               </h1>
 
               <button
@@ -2571,27 +2581,42 @@ function App() {
 
         <main className="page-content">
           <section className="language-strip" aria-label={copy.languageLabel}>
-            <span className="language-label">{copy.languageLabel}</span>
-            <div className="language-switch">
-              <button
-                className={`language-option ${language === 'ko' ? 'is-active' : ''}`}
-                onClick={() => setLanguage('ko')}
-                type="button"
-              >
-                {copy.korean}
-              </button>
-              <button
-                className={`language-option ${language === 'en' ? 'is-active' : ''}`}
-                onClick={() => setLanguage('en')}
-                type="button"
-              >
-                {copy.english}
-              </button>
+            <div className="language-strip-main">
+              <span className="language-label">{copy.languageLabel}</span>
+              <div className="language-switch">
+                <button
+                  className={`language-option ${language === 'ko' ? 'is-active' : ''}`}
+                  onClick={() => setLanguage('ko')}
+                  type="button"
+                >
+                  {copy.korean}
+                </button>
+                <button
+                  className={`language-option ${language === 'en' ? 'is-active' : ''}`}
+                  onClick={() => setLanguage('en')}
+                  type="button"
+                >
+                  {copy.english}
+                </button>
+              </div>
             </div>
+            {view === 'home' ? (
+              <button
+                className="account-shortcut-button"
+                onClick={() => setView('account')}
+                type="button"
+              >
+                <PersonIcon className="button-icon" />
+                <span>
+                  {isAuthenticated
+                    ? copy.homeAccountShortcutSignedIn
+                    : copy.homeAccountShortcutSignedOut}
+                </span>
+              </button>
+            ) : null}
           </section>
 
           {renderCheckoutStatusCard()}
-          {(!isAuthenticated || view === 'home' || view === 'billing') ? renderAuthCard() : null}
 
           {view === 'home' ? (
             <>
@@ -2605,7 +2630,6 @@ function App() {
                   <p>{copy.complianceBody}</p>
                 </div>
               </section>
-
               <section className="selection-stack">
                 <button
                   className="selection-card"
@@ -2924,7 +2948,7 @@ function App() {
             </>
           ) : null}
 
-          {view === 'billing' ? renderBillingPage() : null}
+          {view === 'account' ? renderAccountPage() : null}
           {isPolicyView(view) ? renderPolicyPage(view) : null}
         </main>
 
@@ -2944,8 +2968,8 @@ function App() {
                 return
               }
 
-              if (item.key === 'billing') {
-                setView('billing')
+              if (item.key === 'account') {
+                setView('account')
               }
             }
 
@@ -2964,7 +2988,7 @@ function App() {
                       ? copy.navStyle
                       : item.key === 'hair'
                         ? copy.navHair
-                        : copy.navBilling}
+                        : copy.navAccount}
                 </span>
               </button>
             )

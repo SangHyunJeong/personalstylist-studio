@@ -106,6 +106,13 @@
   padding: 0.1rem 0.1rem 0;
 }
 
+.language-strip-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
 .language-label {
   font-size: 0.78rem;
   font-weight: 700;
@@ -137,6 +144,21 @@
 .language-option.is-active {
   background: var(--accent-primary);
   color: #fff;
+}
+
+.account-shortcut-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.4rem;
+  padding: 0 0.95rem;
+  border: 1px solid rgba(255, 17, 95, 0.3);
+  border-radius: 999px;
+  background: var(--utility-button-bg);
+  color: var(--utility-button-text);
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .hero-section {
@@ -977,6 +999,7 @@
   .action-button,
   .utility-button,
   .policy-link-button,
+  .account-shortcut-button,
   .auth-mode-button,
   .primary-cta,
   .secondary-cta
@@ -1045,6 +1068,11 @@
   .language-strip {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .language-strip-main,
+  .account-shortcut-button {
+    width: 100%;
   }
 
   .selection-heading h3,
