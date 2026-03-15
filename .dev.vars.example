@@ -1,7 +1,10 @@
-GEMINI_API_KEY=your_google_ai_studio_api_key
-POLAR_ACCESS_TOKEN=your_polar_organization_access_token
-POLAR_SERVER=sandbox
-POLAR_WEBHOOK_SECRET=your_polar_webhook_secret
-RESEND_API_KEY=your_resend_api_key
-RESEND_FROM_EMAIL=Personal AI Stylist <noreply@personalstylist.site>
-RESEND_REPLY_TO=support@personalstylist.site
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+# Local Supabase CLI/self-hosted fallback:
+# SUPABASE_ANON_KEY=your-local-anon-key
+GEMINI_API_KEY=
+POLAR_ACCESS_TOKEN=
+POLAR_SERVER=production
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
+RESEND_REPLY_TO=

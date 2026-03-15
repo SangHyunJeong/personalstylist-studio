@@ -1,6 +1,11 @@
+import { requireAuthenticatedUser } from './_supabaseAuth'
+
 interface Env {
   POLAR_ACCESS_TOKEN?: string
   POLAR_SERVER?: string
+  SUPABASE_URL?: string
+  SUPABASE_PUBLISHABLE_KEY?: string
+  SUPABASE_ANON_KEY?: string
 }
 
 interface PagesContext {
@@ -56,6 +61,16 @@ export async function onRequestGet(context: PagesContext) {
     )
   }
 
+  const authenticatedUser = await requireAuthenticatedUser({
+    request,
+    env,
+    preferredLocale,
+  })
+
+  if (authenticatedUser instanceof Response) {
+    return authenticatedUser
+  }
+
   const polarResponse = await fetch(
     `${getBaseApiUrl(env.POLAR_SERVER)}/v1/checkouts/${checkoutId}`,
     {
@@ -80,6 +95,21 @@ export async function onRequestGet(context: PagesContext) {
             : 'Unable to verify the Polar checkout status.'),
       },
       polarResponse.status || 500,
+    )
+  }
+
+  if (
+    authenticatedUser.email &&
+    polarJson.customer_email &&
+    polarJson.customer_email.toLowerCase() !== authenticatedUser.email.toLowerCase()
+  ) {
+    return jsonResponse(
+      {
+        error: isKoreanLocale(preferredLocale)
+          ? '현재 로그인한 계정과 다른 체크아웃입니다.'
+          : 'This checkout belongs to a different signed-in account.',
+      },
+      403,
     )
   }
 

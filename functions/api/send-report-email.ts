@@ -1,7 +1,12 @@
+import { requireAuthenticatedUser } from './_supabaseAuth'
+
 interface Env {
   RESEND_API_KEY?: string
   RESEND_FROM_EMAIL?: string
   RESEND_REPLY_TO?: string
+  SUPABASE_URL?: string
+  SUPABASE_PUBLISHABLE_KEY?: string
+  SUPABASE_ANON_KEY?: string
 }
 
 interface PagesContext {
@@ -273,6 +278,15 @@ export async function onRequestPost(context: PagesContext) {
   const content = body.content?.trim() ?? ''
   const prompt = body.prompt?.trim() ?? ''
   const note = body.note?.trim() ?? ''
+  const authenticatedUser = await requireAuthenticatedUser({
+    request,
+    env,
+    preferredLocale: language === 'ko' ? 'ko-KR' : 'en-US',
+  })
+
+  if (authenticatedUser instanceof Response) {
+    return authenticatedUser
+  }
 
   if (kind !== 'style' && kind !== 'hair') {
     return jsonResponse(
@@ -304,6 +318,20 @@ export async function onRequestPost(context: PagesContext) {
           : 'Please enter a valid email address.',
       },
       400,
+    )
+  }
+
+  if (
+    authenticatedUser.email &&
+    toEmail.toLowerCase() !== authenticatedUser.email.toLowerCase()
+  ) {
+    return jsonResponse(
+      {
+        error: isKorean(language)
+          ? '현재 로그인한 계정 이메일로만 전송할 수 있습니다.'
+          : 'Reports can only be sent to the signed-in account email.',
+      },
+      403,
     )
   }
 

@@ -1,0 +1,1 @@
+-- Seed data is not required for the current auth flow.

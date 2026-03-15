@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import type {
   CSSProperties,
   ChangeEvent,
@@ -6,8 +6,10 @@ import type {
   FormEvent,
   ReactNode,
 } from 'react'
+import type { Session } from '@supabase/supabase-js'
 import { toBlob } from 'html-to-image'
 import { policyDocuments, type PolicyView as LegalView } from './legalContent'
+import { getSupabaseClient, hasSupabaseConfig } from './supabase'
 import './App.css'
 
 type StyleReportResponse = {
@@ -73,6 +75,8 @@ type ProtectedView = Extract<View, 'style' | 'hair'>
 
 type Theme = 'light' | 'dark'
 type Language = 'ko' | 'en'
+type AuthMode = 'sign-in' | 'sign-up'
+type StatusTone = 'success' | 'error' | 'fallback'
 type View = 'home' | 'style' | 'hair' | 'billing' | LegalView
 
 const homeStyleImage =
@@ -171,6 +175,37 @@ const localeCopy = {
     languageLabel: 'Language',
     korean: '한국어',
     english: 'English',
+    authPanelTag: 'ACCOUNT',
+    authPanelTitle: '회원가입 또는 로그인',
+    authPanelBody:
+      '로그인한 계정으로 결제와 결과 생성이 이어집니다.',
+    authLoading: '로그인 세션 확인 중...',
+    authEmailLabel: '이메일',
+    authEmailPlaceholder: 'name@example.com',
+    authPasswordLabel: '비밀번호',
+    authPasswordPlaceholder: '6자 이상 입력',
+    authPasswordConfirmLabel: '비밀번호 확인',
+    authPasswordConfirmPlaceholder: '비밀번호를 다시 입력',
+    authSignInTab: '로그인',
+    authSignUpTab: '회원가입',
+    authSignInAction: '이메일로 로그인',
+    authSignUpAction: '이메일로 회원가입',
+    authSubmitting: '처리 중...',
+    authSignedInTitle: '로그인 완료',
+    authSignedInBody:
+      '이 계정으로 결제와 생성 결과가 연결됩니다.',
+    authSignedInAs: '현재 계정',
+    authSignOutAction: '로그아웃',
+    authConfigMissing:
+      'Supabase 환경변수가 설정되지 않아 회원가입/로그인을 사용할 수 없습니다.',
+    authSessionRequired: '먼저 로그인해 주세요.',
+    authEmailRequired: '이메일을 입력해 주세요.',
+    authPasswordRequired: '비밀번호를 입력해 주세요.',
+    authPasswordsMismatch: '비밀번호 확인이 일치하지 않습니다.',
+    authSignInSuccess: '로그인되었습니다.',
+    authSignUpSuccess:
+      '회원가입 요청이 완료되었습니다. 이메일 확인이 필요한 경우 받은편지함을 확인해 주세요.',
+    authCheckoutRequired: '결제를 시작하려면 먼저 로그인해 주세요.',
     noImageSelected: '아직 선택된 이미지가 없습니다.',
     copySuccess: '프롬프트를 클립보드에 복사했습니다.',
     copyFailure: '클립보드 복사에 실패했습니다. 직접 선택해서 복사해 주세요.',
@@ -294,6 +329,37 @@ const localeCopy = {
     languageLabel: 'Language',
     korean: '한국어',
     english: 'English',
+    authPanelTag: 'ACCOUNT',
+    authPanelTitle: 'Sign Up or Sign In',
+    authPanelBody:
+      'Checkout and generation continue under the signed-in account.',
+    authLoading: 'Checking your session...',
+    authEmailLabel: 'Email',
+    authEmailPlaceholder: 'name@example.com',
+    authPasswordLabel: 'Password',
+    authPasswordPlaceholder: 'Enter at least 6 characters',
+    authPasswordConfirmLabel: 'Confirm password',
+    authPasswordConfirmPlaceholder: 'Re-enter your password',
+    authSignInTab: 'Sign In',
+    authSignUpTab: 'Sign Up',
+    authSignInAction: 'Sign in with email',
+    authSignUpAction: 'Create account with email',
+    authSubmitting: 'Working...',
+    authSignedInTitle: 'Signed in',
+    authSignedInBody:
+      'Checkout and generated results are connected to this account.',
+    authSignedInAs: 'Current account',
+    authSignOutAction: 'Sign out',
+    authConfigMissing:
+      'Supabase environment variables are missing, so sign-up and sign-in are unavailable.',
+    authSessionRequired: 'Please sign in first.',
+    authEmailRequired: 'Please enter your email address.',
+    authPasswordRequired: 'Please enter your password.',
+    authPasswordsMismatch: 'The password confirmation does not match.',
+    authSignInSuccess: 'You are signed in.',
+    authSignUpSuccess:
+      'Your sign-up request was submitted. Check your inbox if email confirmation is enabled.',
+    authCheckoutRequired: 'Please sign in before starting checkout.',
     noImageSelected: 'No image selected yet.',
     copySuccess: 'Prompt copied to your clipboard.',
     copyFailure: 'Clipboard copy failed. Please copy it manually.',
@@ -634,6 +700,15 @@ function App() {
   const [view, setView] = useState<View>(getInitialView)
   const styleReportCaptureRef = useRef<HTMLElement | null>(null)
   const hairReportCaptureRef = useRef<HTMLElement | null>(null)
+  const [authMode, setAuthMode] = useState<AuthMode>('sign-in')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authPasswordConfirm, setAuthPasswordConfirm] = useState('')
+  const [authMessage, setAuthMessage] = useState('')
+  const [authMessageTone, setAuthMessageTone] = useState<StatusTone>('fallback')
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false)
+  const [isAuthLoading, setIsAuthLoading] = useState(hasSupabaseConfig)
+  const [authSession, setAuthSession] = useState<Session | null>(null)
 
   const [height, setHeight] = useState('')
   const [weight, setWeight] = useState('')
@@ -646,7 +721,7 @@ function App() {
   const [styleNote, setStyleNote] = useState('')
   const [styleCopyMessage, setStyleCopyMessage] = useState('')
   const [styleAssetMessage, setStyleAssetMessage] = useState('')
-  const [styleAssetTone, setStyleAssetTone] = useState<'success' | 'error' | 'fallback'>('success')
+  const [styleAssetTone, setStyleAssetTone] = useState<StatusTone>('success')
   const [styleAssetAction, setStyleAssetAction] = useState<'idle' | 'save' | 'share'>('idle')
   const [styleErrorMessage, setStyleErrorMessage] = useState('')
   const [isStyleLoading, setIsStyleLoading] = useState(false)
@@ -661,7 +736,7 @@ function App() {
   const [hairNote, setHairNote] = useState('')
   const [hairCopyMessage, setHairCopyMessage] = useState('')
   const [hairAssetMessage, setHairAssetMessage] = useState('')
-  const [hairAssetTone, setHairAssetTone] = useState<'success' | 'error' | 'fallback'>('success')
+  const [hairAssetTone, setHairAssetTone] = useState<StatusTone>('success')
   const [hairAssetAction, setHairAssetAction] = useState<'idle' | 'save' | 'share'>('idle')
   const [hairErrorMessage, setHairErrorMessage] = useState('')
   const [isHairLoading, setIsHairLoading] = useState(false)
@@ -674,14 +749,21 @@ function App() {
   const [purchaseOrderId, setPurchaseOrderId] = useState(getInitialPurchaseOrderId)
   const [purchaseEmail, setPurchaseEmail] = useState(getInitialPurchaseEmail)
   const [styleEmailMessage, setStyleEmailMessage] = useState('')
-  const [styleEmailTone, setStyleEmailTone] = useState<'success' | 'error' | 'fallback'>('success')
+  const [styleEmailTone, setStyleEmailTone] = useState<StatusTone>('success')
   const [isStyleEmailSending, setIsStyleEmailSending] = useState(false)
   const [hairEmailMessage, setHairEmailMessage] = useState('')
-  const [hairEmailTone, setHairEmailTone] = useState<'success' | 'error' | 'fallback'>('success')
+  const [hairEmailTone, setHairEmailTone] = useState<StatusTone>('success')
   const [isHairEmailSending, setIsHairEmailSending] = useState(false)
   const copy = localeCopy[language]
   const policyCopy = policyDocuments[language]
   const preferredLocale = language === 'ko' ? 'ko-KR' : 'en-US'
+  const authenticatedEmail = authSession?.user.email ?? ''
+  const isAuthenticated = Boolean(authSession?.user)
+
+  const setAuthFeedback = (tone: StatusTone, message: string) => {
+    setAuthMessageTone(tone)
+    setAuthMessage(message)
+  }
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -692,6 +774,73 @@ function App() {
     window.localStorage.setItem('language', language)
     document.documentElement.lang = language === 'ko' ? 'ko' : 'en'
   }, [language])
+
+  useEffect(() => {
+    const client = getSupabaseClient()
+
+    if (!client) {
+      setIsAuthLoading(false)
+      return
+    }
+
+    let isCancelled = false
+
+    void client.auth.getSession().then(({ data, error }) => {
+      if (isCancelled) {
+        return
+      }
+
+      if (error) {
+        setAuthFeedback('error', error.message)
+      }
+
+      setAuthSession(data.session)
+      setIsAuthLoading(false)
+    })
+
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((_event, nextSession) => {
+      if (isCancelled) {
+        return
+      }
+
+      setAuthSession(nextSession)
+      setIsAuthLoading(false)
+    })
+
+    return () => {
+      isCancelled = true
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    setAuthMessage('')
+    setAuthPassword('')
+    setAuthPasswordConfirm('')
+  }, [authMode])
+
+  useEffect(() => {
+    if (isAuthLoading) {
+      return
+    }
+
+    if (isAuthenticated) {
+      return
+    }
+
+    setIsPurchaseVerified(false)
+    setPurchaseOrderId('')
+    setPurchaseEmail('')
+    setCheckoutStatus('idle')
+    setCheckoutStatusMessage('')
+    setCheckoutErrorMessage('')
+
+    if (view === 'style' || view === 'hair') {
+      setView('home')
+    }
+  }, [isAuthLoading, isAuthenticated, view])
 
   useEffect(() => {
     if (purchaseOrderId) {
@@ -930,6 +1079,146 @@ function App() {
     window.localStorage.removeItem(PENDING_ENTRY_VIEW_KEY)
   }
 
+  const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!hasSupabaseConfig) {
+      setAuthFeedback('error', copy.authConfigMissing)
+      return
+    }
+
+    const client = getSupabaseClient()
+
+    if (!client) {
+      setAuthFeedback('error', copy.authConfigMissing)
+      return
+    }
+
+    const trimmedEmail = authEmail.trim()
+
+    if (!trimmedEmail) {
+      setAuthFeedback('error', copy.authEmailRequired)
+      return
+    }
+
+    if (!authPassword.trim()) {
+      setAuthFeedback('error', copy.authPasswordRequired)
+      return
+    }
+
+    if (authMode === 'sign-up' && authPassword !== authPasswordConfirm) {
+      setAuthFeedback('error', copy.authPasswordsMismatch)
+      return
+    }
+
+    try {
+      setIsAuthSubmitting(true)
+      setAuthMessage('')
+
+      if (authMode === 'sign-up') {
+        const { error } = await client.auth.signUp({
+          email: trimmedEmail,
+          password: authPassword,
+        })
+
+        if (error) {
+          throw error
+        }
+
+        setAuthFeedback('success', copy.authSignUpSuccess)
+      } else {
+        const { error } = await client.auth.signInWithPassword({
+          email: trimmedEmail,
+          password: authPassword,
+        })
+
+        if (error) {
+          throw error
+        }
+
+        setAuthFeedback('success', copy.authSignInSuccess)
+      }
+    } catch (error) {
+      setAuthFeedback(
+        'error',
+        error instanceof Error ? error.message : copy.authSessionRequired,
+      )
+    } finally {
+      setIsAuthSubmitting(false)
+    }
+  }
+
+  const handleAuthSignOut = async () => {
+    const client = getSupabaseClient()
+
+    if (!client) {
+      return
+    }
+
+    try {
+      setIsAuthSubmitting(true)
+      setAuthMessage('')
+      clearPendingCheckout()
+      clearPendingEntryView()
+      clearPurchaseState()
+      setAuthPassword('')
+      setAuthPasswordConfirm('')
+      await client.auth.signOut()
+      setView('home')
+      setAuthMode('sign-in')
+    } catch (error) {
+      setAuthFeedback(
+        'error',
+        error instanceof Error ? error.message : copy.authSessionRequired,
+      )
+    } finally {
+      setIsAuthSubmitting(false)
+    }
+  }
+
+  const resolveAccessToken = useCallback(async () => {
+    if (!hasSupabaseConfig) {
+      throw new Error(copy.authConfigMissing)
+    }
+
+    const currentToken = authSession?.access_token?.trim()
+
+    if (currentToken) {
+      return currentToken
+    }
+
+    const client = getSupabaseClient()
+
+    if (!client) {
+      throw new Error(copy.authConfigMissing)
+    }
+
+    const { data, error } = await client.auth.getSession()
+
+    if (error) {
+      throw error
+    }
+
+    const nextToken = data.session?.access_token?.trim()
+
+    if (!nextToken) {
+      throw new Error(copy.authSessionRequired)
+    }
+
+    return nextToken
+  }, [authSession?.access_token, copy.authConfigMissing, copy.authSessionRequired])
+
+  const fetchWithAuth = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const accessToken = await resolveAccessToken()
+    const headers = new Headers(init?.headers)
+    headers.set('Authorization', `Bearer ${accessToken}`)
+
+    return fetch(input, {
+      ...init,
+      headers,
+    })
+  }, [resolveAccessToken])
+
   const toggleTheme = () => {
     setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))
   }
@@ -1011,7 +1300,7 @@ function App() {
       setHeight(payload.height)
       setWeight(payload.weight)
 
-      const response = await fetch('/api/style-report', {
+      const response = await fetchWithAuth('/api/style-report', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1086,7 +1375,7 @@ function App() {
       setHairPhotoPreview(payload.previewUrl)
       setHairPhotoName(payload.photoName)
 
-      const response = await fetch('/api/hairstyle-grid', {
+      const response = await fetchWithAuth('/api/hairstyle-grid', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1158,6 +1447,12 @@ function App() {
   const handleStyleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
+    if (!isAuthenticated) {
+      setAuthFeedback('error', copy.authSessionRequired)
+      setView('home')
+      return
+    }
+
     if (!stylePhotoFile) {
       setStyleErrorMessage(copy.stylePhotoRequired)
       return
@@ -1196,6 +1491,12 @@ function App() {
 
   const handleHairSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    if (!isAuthenticated) {
+      setAuthFeedback('error', copy.authSessionRequired)
+      setView('home')
+      return
+    }
 
     if (!hairPhotoFile) {
       setHairErrorMessage(copy.hairPhotoRequired)
@@ -1331,7 +1632,7 @@ function App() {
       setSending(true)
       setMessage('')
 
-      const response = await fetch('/api/send-report-email', {
+      const response = await fetchWithAuth('/api/send-report-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1522,6 +1823,24 @@ function App() {
   const beginProtectedEntry = async (targetView: ProtectedView) => {
     setCheckoutErrorMessage('')
 
+    if (!hasSupabaseConfig) {
+      setAuthFeedback('error', copy.authConfigMissing)
+      setView('home')
+      return
+    }
+
+    if (isAuthLoading) {
+      setAuthFeedback('fallback', copy.authLoading)
+      setView('home')
+      return
+    }
+
+    if (!isAuthenticated) {
+      setAuthFeedback('error', copy.authSessionRequired)
+      setView('home')
+      return
+    }
+
     if (isPurchaseVerified) {
       setView(targetView)
       return
@@ -1533,11 +1852,29 @@ function App() {
   }
 
   const startCheckout = async () => {
+    if (!hasSupabaseConfig) {
+      setAuthFeedback('error', copy.authConfigMissing)
+      setView('home')
+      return
+    }
+
+    if (isAuthLoading) {
+      setAuthFeedback('fallback', copy.authLoading)
+      setView('home')
+      return
+    }
+
+    if (!isAuthenticated) {
+      setAuthFeedback('error', copy.authCheckoutRequired)
+      setView('home')
+      return
+    }
+
     try {
       setIsCheckoutLoading(true)
       setCheckoutErrorMessage('')
 
-      const response = await fetch('/api/create-checkout', {
+      const response = await fetchWithAuth('/api/create-checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1572,11 +1909,21 @@ function App() {
       return
     }
 
+    if (isAuthLoading) {
+      return
+    }
+
+    if (!isAuthenticated) {
+      setCheckoutStatus('pending')
+      setCheckoutStatusMessage(copy.authSessionRequired)
+      return
+    }
+
     let isCancelled = false
 
     const verifyCheckout = async () => {
       try {
-        const response = await fetch(
+        const response = await fetchWithAuth(
           `/api/checkout-status?checkout_id=${encodeURIComponent(checkoutId)}&preferred_locale=${encodeURIComponent(preferredLocale)}`,
         )
         const rawText = await response.text()
@@ -1636,7 +1983,16 @@ function App() {
     return () => {
       isCancelled = true
     }
-  }, [copy.checkoutError, copy.checkoutPendingBody, copy.checkoutVerifiedBody, preferredLocale])
+  }, [
+    copy.authSessionRequired,
+    copy.checkoutError,
+    copy.checkoutPendingBody,
+    copy.checkoutVerifiedBody,
+    fetchWithAuth,
+    isAuthenticated,
+    isAuthLoading,
+    preferredLocale,
+  ])
 
   const activeNav = isPolicyView(view) ? 'billing' : view
   const currentPolicy = isPolicyView(view) ? policyCopy[view] : null
@@ -1776,6 +2132,158 @@ function App() {
     )
   }
 
+  const renderAuthCard = () => {
+    if (!hasSupabaseConfig) {
+      return (
+        <section className="utility-card auth-status-card">
+          <div className="utility-copy">
+            <div className="utility-icon">
+              <PersonIcon className="utility-icon-svg" />
+            </div>
+            <div>
+              <h4>{copy.authPanelTitle}</h4>
+              <p>{copy.authPanelBody}</p>
+            </div>
+          </div>
+          <p className="status-message error">{copy.authConfigMissing}</p>
+        </section>
+      )
+    }
+
+    if (isAuthLoading) {
+      return (
+        <section className="utility-card auth-status-card">
+          <div className="utility-copy">
+            <div className="utility-icon">
+              <PersonIcon className="utility-icon-svg" />
+            </div>
+            <div>
+              <h4>{copy.authPanelTitle}</h4>
+              <p>{copy.authPanelBody}</p>
+            </div>
+          </div>
+          <p className="status-message fallback">{copy.authLoading}</p>
+        </section>
+      )
+    }
+
+    if (isAuthenticated) {
+      return (
+        <section className="utility-card auth-status-card">
+          <div className="utility-copy">
+            <div className="utility-icon">
+              <PersonIcon className="utility-icon-svg" />
+            </div>
+            <div>
+              <h4>{copy.authSignedInTitle}</h4>
+              <p>{copy.authSignedInBody}</p>
+            </div>
+          </div>
+          <p className="delivery-target">
+            <strong>{copy.authSignedInAs}</strong>
+            <span>{authenticatedEmail || copy.authSessionRequired}</span>
+          </p>
+          {authMessage ? (
+            <p className={`status-message ${authMessageTone}`}>{authMessage}</p>
+          ) : null}
+          <div className="auth-action-row">
+            <button
+              className="utility-button"
+              disabled={isAuthSubmitting}
+              onClick={() => {
+                void handleAuthSignOut()
+              }}
+              type="button"
+            >
+              {copy.authSignOutAction}
+            </button>
+          </div>
+        </section>
+      )
+    }
+
+    return (
+      <section className="panel auth-panel">
+        <div className="report-card-header">
+          <span className="panel-tag">{copy.authPanelTag}</span>
+          <h3>{copy.authPanelTitle}</h3>
+        </div>
+        <p className="rich-paragraph">{copy.authPanelBody}</p>
+        <div className="auth-mode-switch">
+          <button
+            className={`auth-mode-button ${authMode === 'sign-in' ? 'is-active' : ''}`}
+            onClick={() => setAuthMode('sign-in')}
+            type="button"
+          >
+            {copy.authSignInTab}
+          </button>
+          <button
+            className={`auth-mode-button ${authMode === 'sign-up' ? 'is-active' : ''}`}
+            onClick={() => setAuthMode('sign-up')}
+            type="button"
+          >
+            {copy.authSignUpTab}
+          </button>
+        </div>
+        <form className="stack-form" onSubmit={handleAuthSubmit}>
+          <label className="metric-field">
+            <span>{copy.authEmailLabel}</span>
+            <div className="auth-input-wrap">
+              <input
+                autoComplete="email"
+                inputMode="email"
+                onChange={(event) => setAuthEmail(event.target.value)}
+                placeholder={copy.authEmailPlaceholder}
+                type="email"
+                value={authEmail}
+              />
+            </div>
+          </label>
+
+          <label className="metric-field">
+            <span>{copy.authPasswordLabel}</span>
+            <div className="auth-input-wrap">
+              <input
+                autoComplete={authMode === 'sign-in' ? 'current-password' : 'new-password'}
+                onChange={(event) => setAuthPassword(event.target.value)}
+                placeholder={copy.authPasswordPlaceholder}
+                type="password"
+                value={authPassword}
+              />
+            </div>
+          </label>
+
+          {authMode === 'sign-up' ? (
+            <label className="metric-field">
+              <span>{copy.authPasswordConfirmLabel}</span>
+              <div className="auth-input-wrap">
+                <input
+                  autoComplete="new-password"
+                  onChange={(event) => setAuthPasswordConfirm(event.target.value)}
+                  placeholder={copy.authPasswordConfirmPlaceholder}
+                  type="password"
+                  value={authPasswordConfirm}
+                />
+              </div>
+            </label>
+          ) : null}
+
+          {authMessage ? (
+            <p className={`status-message ${authMessageTone}`}>{authMessage}</p>
+          ) : null}
+
+          <button className="action-button" disabled={isAuthSubmitting} type="submit">
+            {isAuthSubmitting
+              ? copy.authSubmitting
+              : authMode === 'sign-in'
+                ? copy.authSignInAction
+                : copy.authSignUpAction}
+          </button>
+        </form>
+      </section>
+    )
+  }
+
   const renderCheckoutStatusCard = () => {
     if (checkoutStatus === 'idle' && !checkoutErrorMessage) {
       return null
@@ -1814,7 +2322,9 @@ function App() {
           <div className="billing-status-card">
             <strong>{copy.checkoutStatusLabel}</strong>
             <p className="rich-paragraph">
-              {isPurchaseVerified
+              {!isAuthenticated
+                ? copy.authCheckoutRequired
+                : isPurchaseVerified
                 ? copy.checkoutVerifiedStatus
                 : checkoutStatus === 'pending'
                   ? copy.checkoutPendingStatus
@@ -1840,6 +2350,8 @@ function App() {
         </div>
         {isPurchaseVerified ? (
           <p className="status-message success">{copy.checkoutVerifiedBody}</p>
+        ) : !isAuthenticated ? (
+          <p className="status-message fallback">{copy.authCheckoutRequired}</p>
         ) : (
           <button
             className="utility-button checkout-button"
@@ -2063,6 +2575,7 @@ function App() {
           </section>
 
           {renderCheckoutStatusCard()}
+          {(!isAuthenticated || view === 'home' || view === 'billing') ? renderAuthCard() : null}
 
           {view === 'home' ? (
             <>

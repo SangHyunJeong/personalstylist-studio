@@ -8,12 +8,17 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "supabase:init": "npx supabase init --yes",
+    "supabase:start": "npx supabase start",
+    "supabase:status": "npx supabase status",
+    "supabase:stop": "npx supabase stop",
     "cf:build": "npm run build",
     "cf:functions:build": "mkdir -p .wrangler/pages-bundle && wrangler pages functions build functions --outdir .wrangler/pages-bundle",
     "cf:dev": "npm run build && npm run cf:functions:build && wrangler dev .wrangler/pages-bundle/index.js --assets dist --local --env-file .dev.vars",
     "cf:deploy": "npm run build && wrangler pages deploy"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.99.1",
     "html-to-image": "^1.11.13",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

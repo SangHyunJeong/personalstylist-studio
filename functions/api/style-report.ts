@@ -1,7 +1,12 @@
+import { requireAuthenticatedUser } from './_supabaseAuth'
+
 interface Env {
   GEMINI_API_KEY?: string
   POLAR_ACCESS_TOKEN?: string
   POLAR_SERVER?: string
+  SUPABASE_URL?: string
+  SUPABASE_PUBLISHABLE_KEY?: string
+  SUPABASE_ANON_KEY?: string
 }
 
 interface PagesContext {
@@ -381,6 +386,16 @@ export async function onRequestPost(context: PagesContext) {
     const { height, weight, imageBase64, mimeType } = body
     preferredLocale = body.preferredLocale
     orderId = body.orderId
+
+    const authenticatedUser = await requireAuthenticatedUser({
+      request,
+      env,
+      preferredLocale,
+    })
+
+    if (authenticatedUser instanceof Response) {
+      return authenticatedUser
+    }
 
     if (!height || !weight || !imageBase64 || !mimeType) {
       return jsonResponse(

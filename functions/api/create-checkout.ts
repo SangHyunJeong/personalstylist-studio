@@ -1,6 +1,11 @@
+import { requireAuthenticatedUser } from './_supabaseAuth'
+
 interface Env {
   POLAR_ACCESS_TOKEN?: string
   POLAR_SERVER?: string
+  SUPABASE_URL?: string
+  SUPABASE_PUBLISHABLE_KEY?: string
+  SUPABASE_ANON_KEY?: string
 }
 
 interface PagesContext {
@@ -69,6 +74,27 @@ export async function onRequestPost(context: PagesContext) {
     )
   }
 
+  const authenticatedUser = await requireAuthenticatedUser({
+    request,
+    env,
+    preferredLocale,
+  })
+
+  if (authenticatedUser instanceof Response) {
+    return authenticatedUser
+  }
+
+  if (!authenticatedUser.email) {
+    return jsonResponse(
+      {
+        error: isKoreanLocale(preferredLocale)
+          ? '체크아웃을 시작하려면 이메일 계정이 필요합니다.'
+          : 'An email account is required to start checkout.',
+      },
+      400,
+    )
+  }
+
   const returnUrl = new URL(currentUrl)
   const successUrl = new URL(currentUrl)
   successUrl.searchParams.set('checkout', 'success')
@@ -83,6 +109,10 @@ export async function onRequestPost(context: PagesContext) {
     },
     body: JSON.stringify({
       products: [PRODUCT_ID],
+      customer_email: authenticatedUser.email,
+      metadata: {
+        supabase_user_id: authenticatedUser.id,
+      },
       success_url: successUrl.toString(),
       return_url: returnUrl.toString(),
       locale: isKoreanLocale(preferredLocale) ? 'ko' : 'en',

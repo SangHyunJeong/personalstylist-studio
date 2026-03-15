@@ -1,73 +1,109 @@
-# React + TypeScript + Vite
+# Personal AI Stylist
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Vite + React frontend with Cloudflare Pages Functions for style generation, checkout, and email delivery.
 
-Currently, two official plugins are available:
+This project now includes Supabase email/password authentication for:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- 회원가입
+- 로그인
+- 로그아웃
+- authenticated API access for checkout, generation, and email delivery
 
-## React Compiler
+## Local Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Install dependencies.
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Copy the example env files.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+cp .env.example .env.local
+cp .dev.vars.example .dev.vars
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+3. Start the local Supabase stack with the CLI.
+
+```bash
+npm run supabase:start
+```
+
+4. Read the local Supabase connection values.
+
+```bash
+npm run supabase:status
+```
+
+5. Put the `API URL` and key into:
+
+- `.env.local`
+- `.dev.vars`
+
+Required variables:
+
+```bash
+# .env.local
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_PUBLISHABLE_KEY=...
+
+# .dev.vars
+SUPABASE_URL=...
+SUPABASE_PUBLISHABLE_KEY=...
+GEMINI_API_KEY=...
+POLAR_ACCESS_TOKEN=...
+POLAR_SERVER=production
+RESEND_API_KEY=...
+RESEND_FROM_EMAIL=...
+RESEND_REPLY_TO=...
+```
+
+Notes:
+
+- Hosted Supabase projects: use the `publishable key`.
+- Local Supabase CLI / self-hosted stacks: `supabase status` still exposes an `anon key`, so put that value into `VITE_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_PUBLISHABLE_KEY`, or use the legacy fallback env names.
+
+6. Run the app.
+
+Frontend only:
+
+```bash
+npm run dev
+```
+
+Cloudflare Pages + Functions locally:
+
+```bash
+npm run cf:dev
+```
+
+## Auth Flow
+
+- The browser uses `@supabase/supabase-js` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` by default, with `VITE_SUPABASE_ANON_KEY` as a local fallback.
+- The UI now shows a sign-up/sign-in card before users can enter protected flows.
+- Cloudflare Functions verify the Supabase bearer token through `SUPABASE_URL/auth/v1/user`, using `SUPABASE_PUBLISHABLE_KEY` by default and `SUPABASE_ANON_KEY` as a fallback.
+- Checkout creation is tied to the signed-in user email.
+- Report email delivery is restricted to the signed-in account email.
+
+## Supabase Files
+
+- `supabase/config.toml` was created with `supabase init`
+- `supabase/seed.sql` is present so the local CLI project is ready for `supabase start`
+
+The local auth config is aligned to Vite defaults:
+
+- `http://127.0.0.1:5173`
+- `http://localhost:5173`
+- preview URLs on port `4173`
+
+## Useful Commands
+
+```bash
+npm run build
+npm run lint
+npm run supabase:start
+npm run supabase:status
+npm run supabase:stop
+npm run cf:functions:build
 ```

@@ -296,9 +296,37 @@
   gap: 0;
 }
 
+.auth-panel {
+  gap: 1rem;
+}
+
 .stack-form {
   display: grid;
   gap: 1rem;
+}
+
+.auth-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+}
+
+.auth-mode-button {
+  min-height: 2.6rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 800;
+}
+
+.auth-mode-button.is-active {
+  background: var(--accent-primary);
+  color: #fff;
 }
 
 .upload-card {
@@ -451,6 +479,29 @@
   color: var(--text-muted);
 }
 
+.auth-input-wrap {
+  display: flex;
+  align-items: center;
+  min-height: 3rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--field-border);
+  border-radius: 0.95rem;
+  background: var(--field-bg);
+}
+
+.auth-input-wrap:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(255, 17, 95, 0.12);
+}
+
+.auth-input-wrap input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-strong);
+  outline: none;
+}
+
 .action-button,
 .utility-button {
   display: inline-flex;
@@ -576,6 +627,14 @@
 
 .delivery-card {
   gap: 0.8rem;
+}
+
+.auth-status-card {
+  gap: 0.8rem;
+}
+
+.auth-action-row {
+  display: flex;
 }
 
 .delivery-target {
@@ -918,6 +977,7 @@
   .action-button,
   .utility-button,
   .policy-link-button,
+  .auth-mode-button,
   .primary-cta,
   .secondary-cta
 ) {
