@@ -6,10 +6,10 @@ import type {
   FormEvent,
   ReactNode,
 } from 'react'
-import type { Session } from '@supabase/supabase-js'
+import type { Session, SupabaseClient } from '@supabase/supabase-js'
 import { toBlob } from 'html-to-image'
 import { policyDocuments, type PolicyView as LegalView } from './legalContent'
-import { getSupabaseClient, hasSupabaseConfig } from './supabase'
+import { loadSupabaseClient } from './supabase'
 import './App.css'
 
 type StyleReportResponse = {
@@ -707,7 +707,9 @@ function App() {
   const [authMessage, setAuthMessage] = useState('')
   const [authMessageTone, setAuthMessageTone] = useState<StatusTone>('fallback')
   const [isAuthSubmitting, setIsAuthSubmitting] = useState(false)
-  const [isAuthLoading, setIsAuthLoading] = useState(hasSupabaseConfig)
+  const [isAuthLoading, setIsAuthLoading] = useState(true)
+  const [hasAuthConfig, setHasAuthConfig] = useState(true)
+  const [supabaseClient, setSupabaseClient] = useState<SupabaseClient | null>(null)
   const [authSession, setAuthSession] = useState<Session | null>(null)
 
   const [height, setHeight] = useState('')
@@ -776,42 +778,56 @@ function App() {
   }, [language])
 
   useEffect(() => {
-    const client = getSupabaseClient()
-
-    if (!client) {
-      setIsAuthLoading(false)
-      return
-    }
-
     let isCancelled = false
+    let unsubscribe = () => {}
 
-    void client.auth.getSession().then(({ data, error }) => {
+    void loadSupabaseClient().then((client) => {
       if (isCancelled) {
         return
       }
 
-      if (error) {
-        setAuthFeedback('error', error.message)
-      }
-
-      setAuthSession(data.session)
-      setIsAuthLoading(false)
-    })
-
-    const {
-      data: { subscription },
-    } = client.auth.onAuthStateChange((_event, nextSession) => {
-      if (isCancelled) {
+      if (!client) {
+        setSupabaseClient(null)
+        setHasAuthConfig(false)
+        setIsAuthLoading(false)
         return
       }
 
-      setAuthSession(nextSession)
-      setIsAuthLoading(false)
+      setSupabaseClient(client)
+      setHasAuthConfig(true)
+
+      void client.auth.getSession().then(({ data, error }) => {
+        if (isCancelled) {
+          return
+        }
+
+        if (error) {
+          setAuthFeedback('error', error.message)
+        }
+
+        setAuthSession(data.session)
+        setIsAuthLoading(false)
+      })
+
+      const {
+        data: { subscription },
+      } = client.auth.onAuthStateChange((_event, nextSession) => {
+        if (isCancelled) {
+          return
+        }
+
+        setAuthSession(nextSession)
+        setIsAuthLoading(false)
+      })
+
+      unsubscribe = () => {
+        subscription.unsubscribe()
+      }
     })
 
     return () => {
       isCancelled = true
-      subscription.unsubscribe()
+      unsubscribe()
     }
   }, [])
 
@@ -1082,14 +1098,12 @@ function App() {
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!hasSupabaseConfig) {
+    if (!hasAuthConfig) {
       setAuthFeedback('error', copy.authConfigMissing)
       return
     }
 
-    const client = getSupabaseClient()
-
-    if (!client) {
+    if (!supabaseClient) {
       setAuthFeedback('error', copy.authConfigMissing)
       return
     }
@@ -1116,7 +1130,7 @@ function App() {
       setAuthMessage('')
 
       if (authMode === 'sign-up') {
-        const { error } = await client.auth.signUp({
+        const { error } = await supabaseClient.auth.signUp({
           email: trimmedEmail,
           password: authPassword,
         })
@@ -1127,7 +1141,7 @@ function App() {
 
         setAuthFeedback('success', copy.authSignUpSuccess)
       } else {
-        const { error } = await client.auth.signInWithPassword({
+        const { error } = await supabaseClient.auth.signInWithPassword({
           email: trimmedEmail,
           password: authPassword,
         })
@@ -1149,9 +1163,7 @@ function App() {
   }
 
   const handleAuthSignOut = async () => {
-    const client = getSupabaseClient()
-
-    if (!client) {
+    if (!supabaseClient) {
       return
     }
 
@@ -1163,7 +1175,7 @@ function App() {
       clearPurchaseState()
       setAuthPassword('')
       setAuthPasswordConfirm('')
-      await client.auth.signOut()
+      await supabaseClient.auth.signOut()
       setView('home')
       setAuthMode('sign-in')
     } catch (error) {
@@ -1177,7 +1189,7 @@ function App() {
   }
 
   const resolveAccessToken = useCallback(async () => {
-    if (!hasSupabaseConfig) {
+    if (!hasAuthConfig) {
       throw new Error(copy.authConfigMissing)
     }
 
@@ -1187,13 +1199,11 @@ function App() {
       return currentToken
     }
 
-    const client = getSupabaseClient()
-
-    if (!client) {
+    if (!supabaseClient) {
       throw new Error(copy.authConfigMissing)
     }
 
-    const { data, error } = await client.auth.getSession()
+    const { data, error } = await supabaseClient.auth.getSession()
 
     if (error) {
       throw error
@@ -1206,7 +1216,13 @@ function App() {
     }
 
     return nextToken
-  }, [authSession?.access_token, copy.authConfigMissing, copy.authSessionRequired])
+  }, [
+    authSession?.access_token,
+    copy.authConfigMissing,
+    copy.authSessionRequired,
+    hasAuthConfig,
+    supabaseClient,
+  ])
 
   const fetchWithAuth = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
     const accessToken = await resolveAccessToken()
@@ -1823,7 +1839,7 @@ function App() {
   const beginProtectedEntry = async (targetView: ProtectedView) => {
     setCheckoutErrorMessage('')
 
-    if (!hasSupabaseConfig) {
+    if (!hasAuthConfig) {
       setAuthFeedback('error', copy.authConfigMissing)
       setView('home')
       return
@@ -1852,7 +1868,7 @@ function App() {
   }
 
   const startCheckout = async () => {
-    if (!hasSupabaseConfig) {
+    if (!hasAuthConfig) {
       setAuthFeedback('error', copy.authConfigMissing)
       setView('home')
       return
@@ -2133,7 +2149,7 @@ function App() {
   }
 
   const renderAuthCard = () => {
-    if (!hasSupabaseConfig) {
+    if (!hasAuthConfig) {
       return (
         <section className="utility-card auth-status-card">
           <div className="utility-copy">
