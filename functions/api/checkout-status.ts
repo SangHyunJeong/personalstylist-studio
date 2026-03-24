@@ -2,7 +2,7 @@ import { requireAuthenticatedUser } from './_supabaseAuth'
 import {
   deriveBillingAccessFromCustomerState,
   extractPolarErrorMessage,
-  fetchPolarCustomerStateByExternalId,
+  fetchPolarCustomerStateForIdentity,
   getBaseApiUrl,
   parsePolarJson,
   POLAR_SUBSCRIPTION_PRODUCT_ID,
@@ -27,6 +27,7 @@ type PolarCheckoutStatusResponse = {
   status?: string
   product_id?: string
   order_id?: string
+  customer_id?: string
   customer_email?: string
   error?: {
     message?: string
@@ -120,9 +121,11 @@ export async function onRequestGet(context: PagesContext) {
   let customerEmail = polarJson.customer_email ?? authenticatedUser.email ?? ''
 
   if (polarJson.status === 'succeeded') {
-    const customerState = await fetchPolarCustomerStateByExternalId({
+    const customerState = await fetchPolarCustomerStateForIdentity({
       env,
       externalCustomerId: authenticatedUser.id,
+      customerEmail: polarJson.customer_email ?? authenticatedUser.email ?? '',
+      customerId: polarJson.customer_id,
     })
 
     if (customerState.response.status === 404) {

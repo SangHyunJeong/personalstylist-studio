@@ -1,6 +1,6 @@
 import {
   deriveBillingAccessFromCustomerState,
-  fetchPolarCustomerStateByExternalId,
+  fetchPolarCustomerStateForIdentity,
   type PolarEnv,
 } from './_polarBilling'
 import { getSupabaseAdminClient, type SupabaseAdminEnv } from './_supabaseAdmin'
@@ -1120,9 +1120,10 @@ const checkPolarAccess = async (env: DailyStylistEnv, profile: DailyStyleProfile
     throw new Error('POLAR_ACCESS_TOKEN is not configured on the server.')
   }
 
-  const customerState = await fetchPolarCustomerStateByExternalId({
+  const customerState = await fetchPolarCustomerStateForIdentity({
     env,
     externalCustomerId: profile.user_id,
+    customerEmail: profile.email,
   })
 
   if (customerState.response.status === 404) {

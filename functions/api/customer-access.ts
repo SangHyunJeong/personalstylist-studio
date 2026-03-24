@@ -2,7 +2,7 @@ import { requireAuthenticatedUser } from './_supabaseAuth'
 import {
   deriveBillingAccessFromCustomerState,
   extractPolarErrorMessage,
-  fetchPolarCustomerStateByExternalId,
+  fetchPolarCustomerStateForIdentity,
   type PolarApiErrorResponse,
   type PolarCustomerStateResponse,
 } from './_polarBilling'
@@ -51,9 +51,10 @@ export async function onRequestGet(context: PagesContext) {
     return authenticatedUser
   }
 
-  const customerState = await fetchPolarCustomerStateByExternalId({
+  const customerState = await fetchPolarCustomerStateForIdentity({
     env,
     externalCustomerId: authenticatedUser.id,
+    customerEmail: authenticatedUser.email ?? '',
   })
 
   if (customerState.response.status === 404) {
