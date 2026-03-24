@@ -81,6 +81,7 @@ type ProtectedView = Extract<View, 'style' | 'hair'>
 type Theme = 'light' | 'dark'
 type Language = 'ko' | 'en'
 type AuthMode = 'sign-in' | 'sign-up'
+type AccountSection = 'profile' | 'password' | 'delete'
 type StatusTone = 'success' | 'error' | 'fallback'
 type View = 'home' | 'style' | 'hair' | 'account' | LegalView
 
@@ -807,6 +808,37 @@ const CheckIcon = ({ className = '' }: { className?: string }) => (
   </Icon>
 )
 
+const ChevronDownIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <path
+      d="m7.5 10 4.5 4.5 4.5-4.5"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+    />
+  </Icon>
+)
+
+const WarningIcon = ({ className = '' }: { className?: string }) => (
+  <Icon className={className}>
+    <path
+      d="M12 4.75 4.9 18h14.2L12 4.75Z"
+      fill="none"
+      stroke="currentColor"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+    />
+    <path
+      d="M12 9.3v4.25M12 16.3h.01"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeWidth="1.8"
+    />
+  </Icon>
+)
+
 const HomeIcon = ({ className = '' }: { className?: string }) => (
   <Icon className={className}>
     <path
@@ -881,6 +913,7 @@ function App() {
   const [accountPassword, setAccountPassword] = useState('')
   const [accountPasswordConfirm, setAccountPasswordConfirm] = useState('')
   const [accountPasswordNonce, setAccountPasswordNonce] = useState('')
+  const [openAccountSection, setOpenAccountSection] = useState<AccountSection | null>(null)
   const [passwordMessage, setPasswordMessage] = useState('')
   const [passwordMessageTone, setPasswordMessageTone] = useState<StatusTone>('success')
   const [deleteConfirmationEmail, setDeleteConfirmationEmail] = useState('')
@@ -950,6 +983,11 @@ function App() {
     authSession?.user.created_at,
     preferredLocale,
   )
+  const accountProfileSummary =
+    [authenticatedEmail, authProvider].filter(Boolean).join(' / ') ||
+    copy.accountProfileBody
+  const accountPasswordSummary = passwordMessage || copy.accountPasswordBody
+  const accountDeleteSummary = deleteMessage || copy.accountDeleteBody
 
   const setAuthFeedback = (tone: StatusTone, message: string) => {
     setAuthMessageTone(tone)
@@ -965,6 +1003,10 @@ function App() {
     setDeleteMessageTone(tone)
     setDeleteMessage(message)
   }
+
+  const toggleAccountSection = useCallback((section: AccountSection) => {
+    setOpenAccountSection((current) => (current === section ? null : section))
+  }, [])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -1048,6 +1090,7 @@ function App() {
     setAccountPassword('')
     setAccountPasswordConfirm('')
     setAccountPasswordNonce('')
+    setOpenAccountSection(null)
     setPasswordMessage('')
     setDeleteConfirmationEmail('')
     setDeleteMessage('')
@@ -1436,6 +1479,7 @@ function App() {
       setAccountPassword('')
       setAccountPasswordConfirm('')
       setAccountPasswordNonce('')
+      setOpenAccountSection(null)
       setPasswordMessage('')
       setDeleteConfirmationEmail('')
       setDeleteMessage('')
@@ -2766,153 +2810,202 @@ function App() {
 
     return (
       <>
-        <section className="utility-card account-settings-card">
-          <div className="utility-copy">
-            <div className="utility-icon">
-              <PersonIcon className="utility-icon-svg" />
+        <section
+          className="utility-card account-settings-card"
+          data-open={openAccountSection === 'profile' ? 'true' : 'false'}
+        >
+          <button
+            aria-controls="account-profile-panel"
+            aria-expanded={openAccountSection === 'profile'}
+            className="account-accordion-button"
+            onClick={() => toggleAccountSection('profile')}
+            type="button"
+          >
+            <div className="utility-copy">
+              <div className="utility-icon">
+                <PersonIcon className="utility-icon-svg" />
+              </div>
+              <div>
+                <h4>{copy.accountProfileTitle}</h4>
+                <p>{accountProfileSummary}</p>
+              </div>
             </div>
-            <div>
-              <h4>{copy.accountProfileTitle}</h4>
-              <p>{copy.accountProfileBody}</p>
+            <ChevronDownIcon className="account-accordion-chevron" />
+          </button>
+          <div className="account-accordion-panel" id="account-profile-panel">
+            <div className="account-accordion-panel-inner">
+              <div className="account-accordion-content">
+                <div className="account-info-grid">
+                  <p className="delivery-target">
+                    <strong>{copy.accountEmailLabel}</strong>
+                    <span>{authenticatedEmail || copy.accountUnavailable}</span>
+                  </p>
+                  <p className="delivery-target">
+                    <strong>{copy.accountProviderLabel}</strong>
+                    <span>{authProvider || copy.accountUnavailable}</span>
+                  </p>
+                  <p className="delivery-target">
+                    <strong>{copy.accountCreatedAtLabel}</strong>
+                    <span>{accountCreatedAt || copy.accountUnavailable}</span>
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="account-info-grid">
-            <p className="delivery-target">
-              <strong>{copy.accountEmailLabel}</strong>
-              <span>{authenticatedEmail || copy.accountUnavailable}</span>
-            </p>
-            <p className="delivery-target">
-              <strong>{copy.accountProviderLabel}</strong>
-              <span>{authProvider || copy.accountUnavailable}</span>
-            </p>
-            <p className="delivery-target">
-              <strong>{copy.accountCreatedAtLabel}</strong>
-              <span>{accountCreatedAt || copy.accountUnavailable}</span>
-            </p>
-            <p className="delivery-target">
-              <strong>{copy.accountUserIdLabel}</strong>
-              <span>{authSession?.user.id || copy.accountUnavailable}</span>
-            </p>
           </div>
         </section>
 
-        <section className="utility-card account-settings-card">
-          <div className="utility-copy">
-            <div className="utility-icon">
-              <CheckIcon className="utility-icon-svg" />
+        <section
+          className="utility-card account-settings-card"
+          data-open={openAccountSection === 'password' ? 'true' : 'false'}
+        >
+          <button
+            aria-controls="account-password-panel"
+            aria-expanded={openAccountSection === 'password'}
+            className="account-accordion-button"
+            onClick={() => toggleAccountSection('password')}
+            type="button"
+          >
+            <div className="utility-copy">
+              <div className="utility-icon">
+                <CheckIcon className="utility-icon-svg" />
+              </div>
+              <div>
+                <h4>{copy.accountPasswordTitle}</h4>
+                <p>{accountPasswordSummary}</p>
+              </div>
             </div>
-            <div>
-              <h4>{copy.accountPasswordTitle}</h4>
-              <p>{copy.accountPasswordBody}</p>
+            <ChevronDownIcon className="account-accordion-chevron" />
+          </button>
+          <div className="account-accordion-panel" id="account-password-panel">
+            <div className="account-accordion-panel-inner">
+              <div className="account-accordion-content">
+                <form className="stack-form" onSubmit={handlePasswordUpdate}>
+                  <label className="metric-field">
+                    <span>{copy.accountPasswordLabel}</span>
+                    <div className="auth-input-wrap">
+                      <input
+                        autoComplete="new-password"
+                        onChange={(event) => setAccountPassword(event.target.value)}
+                        placeholder={copy.accountPasswordPlaceholder}
+                        type="password"
+                        value={accountPassword}
+                      />
+                    </div>
+                  </label>
+                  <label className="metric-field">
+                    <span>{copy.accountPasswordConfirmLabel}</span>
+                    <div className="auth-input-wrap">
+                      <input
+                        autoComplete="new-password"
+                        onChange={(event) => setAccountPasswordConfirm(event.target.value)}
+                        placeholder={copy.accountPasswordConfirmPlaceholder}
+                        type="password"
+                        value={accountPasswordConfirm}
+                      />
+                    </div>
+                  </label>
+                  <label className="metric-field">
+                    <span>{copy.accountPasswordNonceLabel}</span>
+                    <div className="auth-input-wrap">
+                      <input
+                        autoComplete="one-time-code"
+                        inputMode="numeric"
+                        onChange={(event) => setAccountPasswordNonce(event.target.value)}
+                        placeholder={copy.accountPasswordNoncePlaceholder}
+                        type="text"
+                        value={accountPasswordNonce}
+                      />
+                    </div>
+                  </label>
+                  {passwordMessage ? (
+                    <p className={`status-message ${passwordMessageTone}`}>{passwordMessage}</p>
+                  ) : null}
+                  <div className="account-action-grid">
+                    <button
+                      className="utility-button"
+                      disabled={isPasswordNonceSending || isPasswordUpdating}
+                      onClick={() => {
+                        void handlePasswordReauthentication()
+                      }}
+                      type="button"
+                    >
+                      {isPasswordNonceSending
+                        ? copy.authSubmitting
+                        : copy.accountPasswordNonceAction}
+                    </button>
+                    <button
+                      className="action-button"
+                      disabled={isPasswordUpdating || isPasswordNonceSending}
+                      type="submit"
+                    >
+                      {isPasswordUpdating
+                        ? copy.authSubmitting
+                        : copy.accountPasswordAction}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
-          <form className="stack-form" onSubmit={handlePasswordUpdate}>
-            <label className="metric-field">
-              <span>{copy.accountPasswordLabel}</span>
-              <div className="auth-input-wrap">
-                <input
-                  autoComplete="new-password"
-                  onChange={(event) => setAccountPassword(event.target.value)}
-                  placeholder={copy.accountPasswordPlaceholder}
-                  type="password"
-                  value={accountPassword}
-                />
-              </div>
-            </label>
-            <label className="metric-field">
-              <span>{copy.accountPasswordConfirmLabel}</span>
-              <div className="auth-input-wrap">
-                <input
-                  autoComplete="new-password"
-                  onChange={(event) => setAccountPasswordConfirm(event.target.value)}
-                  placeholder={copy.accountPasswordConfirmPlaceholder}
-                  type="password"
-                  value={accountPasswordConfirm}
-                />
-              </div>
-            </label>
-            <label className="metric-field">
-              <span>{copy.accountPasswordNonceLabel}</span>
-              <div className="auth-input-wrap">
-                <input
-                  autoComplete="one-time-code"
-                  inputMode="numeric"
-                  onChange={(event) => setAccountPasswordNonce(event.target.value)}
-                  placeholder={copy.accountPasswordNoncePlaceholder}
-                  type="text"
-                  value={accountPasswordNonce}
-                />
-              </div>
-            </label>
-            {passwordMessage ? (
-              <p className={`status-message ${passwordMessageTone}`}>{passwordMessage}</p>
-            ) : null}
-            <div className="account-action-grid">
-              <button
-                className="utility-button"
-                disabled={isPasswordNonceSending || isPasswordUpdating}
-                onClick={() => {
-                  void handlePasswordReauthentication()
-                }}
-                type="button"
-              >
-                {isPasswordNonceSending
-                  ? copy.authSubmitting
-                  : copy.accountPasswordNonceAction}
-              </button>
-              <button
-                className="action-button"
-                disabled={isPasswordUpdating || isPasswordNonceSending}
-                type="submit"
-              >
-                {isPasswordUpdating
-                  ? copy.authSubmitting
-                  : copy.accountPasswordAction}
-              </button>
-            </div>
-          </form>
         </section>
 
-        <section className="utility-card account-settings-card danger-card">
-          <div className="utility-copy">
-            <div className="utility-icon">
-              <SparkleIcon className="utility-icon-svg" />
+        <section
+          className="utility-card account-settings-card danger-card"
+          data-open={openAccountSection === 'delete' ? 'true' : 'false'}
+        >
+          <button
+            aria-controls="account-delete-panel"
+            aria-expanded={openAccountSection === 'delete'}
+            className="account-accordion-button"
+            onClick={() => toggleAccountSection('delete')}
+            type="button"
+          >
+            <div className="utility-copy">
+              <div className="utility-icon">
+                <WarningIcon className="utility-icon-svg" />
+              </div>
+              <div>
+                <h4>{copy.accountDeleteTitle}</h4>
+                <p>{accountDeleteSummary}</p>
+              </div>
             </div>
-            <div>
-              <h4>{copy.accountDeleteTitle}</h4>
-              <p>{copy.accountDeleteBody}</p>
+            <ChevronDownIcon className="account-accordion-chevron" />
+          </button>
+          <div className="account-accordion-panel" id="account-delete-panel">
+            <div className="account-accordion-panel-inner">
+              <div className="account-accordion-content">
+                <form className="stack-form" onSubmit={handleDeleteAccount}>
+                  <label className="metric-field">
+                    <span>{copy.accountDeleteConfirmLabel}</span>
+                    <div className="auth-input-wrap">
+                      <input
+                        autoComplete="email"
+                        inputMode="email"
+                        onChange={(event) => setDeleteConfirmationEmail(event.target.value)}
+                        placeholder={copy.accountDeleteConfirmPlaceholder}
+                        type="email"
+                        value={deleteConfirmationEmail}
+                      />
+                    </div>
+                  </label>
+                  {deleteMessage ? (
+                    <p className={`status-message ${deleteMessageTone}`}>{deleteMessage}</p>
+                  ) : null}
+                  <button
+                    className="utility-button danger-button"
+                    disabled={isAccountDeleting}
+                    type="submit"
+                  >
+                    {isAccountDeleting ? copy.authSubmitting : copy.accountDeleteAction}
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
-          <form className="stack-form" onSubmit={handleDeleteAccount}>
-            <label className="metric-field">
-              <span>{copy.accountDeleteConfirmLabel}</span>
-              <div className="auth-input-wrap">
-                <input
-                  autoComplete="email"
-                  inputMode="email"
-                  onChange={(event) => setDeleteConfirmationEmail(event.target.value)}
-                  placeholder={copy.accountDeleteConfirmPlaceholder}
-                  type="email"
-                  value={deleteConfirmationEmail}
-                />
-              </div>
-            </label>
-            {deleteMessage ? (
-              <p className={`status-message ${deleteMessageTone}`}>{deleteMessage}</p>
-            ) : null}
-            <button
-              className="utility-button danger-button"
-              disabled={isAccountDeleting}
-              type="submit"
-            >
-              {isAccountDeleting ? copy.authSubmitting : copy.accountDeleteAction}
-            </button>
-          </form>
         </section>
       </>
     )
   }
-
   const renderAccountPage = () => (
     <>
       {renderAuthCard()}
