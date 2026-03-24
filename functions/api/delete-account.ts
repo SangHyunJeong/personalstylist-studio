@@ -21,6 +21,23 @@ const jsonResponse = (
 const isKoreanLocale = (preferredLocale?: string) =>
   preferredLocale?.toLowerCase().startsWith('ko') ?? false
 
+const formatAdminError = (
+  preferredLocale: string | undefined,
+  fallbackKo: string,
+  fallbackEn: string,
+  detail?: string,
+) => {
+  const normalizedDetail = detail?.trim()
+
+  if (!normalizedDetail) {
+    return isKoreanLocale(preferredLocale) ? fallbackKo : fallbackEn
+  }
+
+  return isKoreanLocale(preferredLocale)
+    ? `${fallbackKo} 상세: ${normalizedDetail}`
+    : `${fallbackEn} Details: ${normalizedDetail}`
+}
+
 export async function onRequestPost(context: PagesContext) {
   const { request, env } = context
 
@@ -64,17 +81,53 @@ export async function onRequestPost(context: PagesContext) {
     },
   })
 
+  const { data: existingUser, error: lookupError } =
+    await adminClient.auth.admin.getUserById(authenticatedUser.id)
+
+  if (lookupError || !existingUser.user) {
+    const detail = lookupError?.message || 'Signed-in user was not found in the configured Supabase project.'
+    console.error('Delete account lookup failed', {
+      userId: authenticatedUser.id,
+      detail,
+      status: lookupError?.status,
+      code: lookupError?.code,
+    })
+
+    return jsonResponse(
+      {
+        error: formatAdminError(
+          preferredLocale,
+          '계정 정보를 확인하지 못했습니다.',
+          'Unable to verify the account before deletion.',
+          detail,
+        ),
+      },
+      500,
+    )
+  }
+
   const { error } = await adminClient.auth.admin.deleteUser(
     authenticatedUser.id,
     true,
   )
 
   if (error) {
+    console.error('Delete account request failed', {
+      userId: authenticatedUser.id,
+      detail: error.message,
+      status: error.status,
+      code: error.code,
+      name: error.name,
+    })
+
     return jsonResponse(
       {
-        error: isKoreanLocale(preferredLocale)
-          ? '계정을 탈퇴하지 못했습니다. 잠시 후 다시 시도해 주세요.'
-          : 'Unable to delete the account. Please try again shortly.',
+        error: formatAdminError(
+          preferredLocale,
+          '계정을 탈퇴하지 못했습니다.',
+          'Unable to delete the account.',
+          error.message,
+        ),
       },
       500,
     )
