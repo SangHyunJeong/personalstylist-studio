@@ -62,6 +62,7 @@ export async function onRequestGet(context: PagesContext) {
       hasAccess: false,
       subscriptionStatus: 'inactive',
       customerEmail: authenticatedUser.email,
+      subscription: null,
     })
   }
 

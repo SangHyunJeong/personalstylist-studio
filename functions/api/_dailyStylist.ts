@@ -268,6 +268,7 @@ const getLocalizedStrings = (preferredLocale?: string) =>
         heading: '오늘 아침 스타일 브리프가 도착했습니다',
         intro: '저장된 체형 정보, 기준 사진, 오늘 날씨를 바탕으로 아침 스타일 추천을 정리했습니다.',
         weatherHeading: '오늘 날씨 요약',
+        photoHeading: '오늘 브리프에 사용한 기준 사진',
         briefHeading: '오늘의 스타일 추천',
         footer: '이 메일은 활성화된 무료 체험 또는 구독 계정에만 발송됩니다.',
       }
@@ -276,6 +277,7 @@ const getLocalizedStrings = (preferredLocale?: string) =>
         heading: 'Your morning style brief is ready',
         intro: 'This recommendation was prepared from your saved body details, reference photo, and today\'s weather.',
         weatherHeading: 'Today\'s weather',
+        photoHeading: 'Reference photo used for today\'s brief',
         briefHeading: 'Today\'s styling recommendation',
         footer: 'This email is only delivered to accounts with an active trial or subscription.',
       }
@@ -285,11 +287,13 @@ const buildDailyEmailHtml = ({
   locationName,
   weatherSummary,
   brief,
+  referencePhotoCid,
 }: {
   preferredLocale?: string
   locationName: string
   weatherSummary: string
   brief: string
+  referencePhotoCid?: string
 }) => {
   const strings = getLocalizedStrings(preferredLocale)
 
@@ -302,6 +306,12 @@ const buildDailyEmailHtml = ({
     '<h2 style="margin:0 0 12px;font-size:17px;color:#201720">' + escapeHtml(strings.weatherHeading) + '</h2>' +
     '<p style="margin:0;color:#4a3d4a;line-height:1.7"><strong>' + escapeHtml(locationName) + '</strong><br />' + escapeHtml(weatherSummary) + '</p>' +
     '</div>' +
+    (referencePhotoCid
+      ? '<div style="border-radius:18px;background:#fff;border:1px solid #ead9d5;padding:18px;margin-bottom:16px">' +
+        '<h2 style="margin:0 0 12px;font-size:17px;color:#201720">' + escapeHtml(strings.photoHeading) + '</h2>' +
+        '<img src="cid:' + escapeHtml(referencePhotoCid) + '" alt="" style="display:block;width:100%;border-radius:18px;border:1px solid #ead9d5;max-height:420px;object-fit:cover" />' +
+        '</div>'
+      : '') +
     '<div style="border-radius:18px;background:#fff;border:1px solid #ead9d5;padding:18px;margin-bottom:16px">' +
     '<h2 style="margin:0 0 12px;font-size:17px;color:#201720">' + escapeHtml(strings.briefHeading) + '</h2>' +
     renderRichTextHtml(brief) +
@@ -565,7 +575,94 @@ const buildDailyBriefPrompt = ({
   'Weight: ' + profile.weight_kg + ' kg',
   'Daily weather summary: ' + weather.summary,
   'Weather code meaning: ' + weatherCodeDescription(weather.weatherCode, profile.preferred_locale),
-].join('\n')
+].join('\n');
+
+const isRecoverableGeminiBriefError = (message?: string) => {
+  const value = message?.toLowerCase() ?? ''
+
+  return (
+    value.includes('spending cap') ||
+    value.includes('billing') ||
+    value.includes('quota') ||
+    value.includes('resource exhausted') ||
+    value.includes('user location is not supported') ||
+    value.includes('429')
+  )
+}
+
+const buildFallbackDailyBrief = ({
+  profile,
+  weather,
+}: {
+  profile: DailyStyleProfileRecord
+  weather: DailyWeatherSnapshot
+}) => {
+  const ko = isKoreanLocale(profile.preferred_locale)
+  const high = weather.highCelsius
+  const low = weather.lowCelsius
+  const rainChance = weather.precipitationProbability ?? 0
+  const warm = high !== null && high >= 24
+  const cold = low !== null && low <= 8
+  const rainy = rainChance >= 40 || [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(weather.weatherCode)
+
+  if (ko) {
+    return [
+      "### Today's weather fit" ,
+      '* ' + weather.summary,
+      warm
+        ? '* 통기성이 좋은 상의와 가벼운 하의 조합으로 체온 상승을 막아 주세요.'
+        : cold
+          ? '* 아침과 저녁 온도차를 고려해 얇은 아우터 또는 니트 레이어를 준비하세요.'
+          : '* 실내외 온도차에 대응할 수 있는 가벼운 레이어링을 유지하세요.',
+      '',
+      '### Outfit formula',
+      rainy
+        ? '* 상의는 정돈된 기본 톱, 하의는 활동성 있는 팬츠, 겉옷은 생활 방수 가능한 가벼운 아우터 조합을 추천합니다.'
+        : '* 상의는 깔끔한 기본 톱, 하의는 실루엣이 정리되는 팬츠나 스커트, 바깥 레이어는 얇은 재킷 또는 가디건 조합이 좋습니다.',
+      '* 신발은 오래 걸어도 부담이 적고 오늘 날씨에 맞는 소재를 우선하세요.',
+      '',
+      '### Styling note',
+      '* 얼굴 주변은 과한 장식보다 톤이 정리된 컬러 포인트 하나로 마무리하는 편이 안정적입니다.',
+      '* 기준 사진의 전체 비율을 살리려면 허리선이나 세로 라인이 보이는 실루엣이 유리합니다.',
+      '',
+      '### Avoid today',
+      rainy
+        ? '* 비와 습기에 약한 무거운 소재나 바닥에 끌리는 긴 기장은 피하는 편이 좋습니다.'
+        : '* 체형 비율을 애매하게 끊는 중간 길이 상의와 과한 오버핏 중첩은 피하세요.',
+      '',
+      '### Why this works today',
+      '* 현재는 AI 생성 한도 이슈가 있어 예비 브리프를 발송했지만, 오늘 날씨와 저장된 체형 정보 기준으로 아침 준비 시간을 줄이는 데 초점을 맞췄습니다.',
+    ].join('\n')
+  }
+
+  return [
+    "### Today's weather fit" ,
+    '* ' + weather.summary,
+    warm
+      ? '* Keep the base outfit breathable and light so the look stays polished without trapping heat.'
+      : cold
+        ? '* Plan for a knit or light outer layer so the outfit stays balanced across the cooler parts of the day.'
+        : '* A light layer will help you stay comfortable through indoor and outdoor temperature changes.',
+    '',
+    '### Outfit formula',
+    rainy
+      ? '* Start with a clean base top, add practical bottoms, and finish with a light outer layer that can handle damp conditions.'
+      : '* Start with a clean base top, use bottoms with a defined line, and finish with a light jacket or cardigan.',
+    '* Choose shoes that stay comfortable through the day and suit the ground conditions.',
+    '',
+    '### Styling note',
+    '* Keep the face area clean and let one controlled color or accessory do the work instead of adding too many details.',
+    '* A visible waist line or vertical structure will usually read best with the proportions in the saved reference photo.',
+    '',
+    '### Avoid today',
+    rainy
+      ? '* Avoid heavy fabrics or long hems that become awkward in wet conditions.'
+      : '* Avoid mid-length tops that cut the proportions unclearly and oversized layering that makes the shape look heavy.',
+    '',
+    '### Why this works today',
+    '* The AI generation limit was hit, so this fallback brief focuses on weather fit and proportion-friendly choices you can use right away this morning.',
+  ].join('\n')
+};
 
 const callGeminiText = async ({
   env,
@@ -1208,13 +1305,21 @@ const generateDailyBrief = async (
     throw new Error('The stored profile photo could not be loaded from R2.')
   }
 
-  return callGeminiText({
-    env,
-    prompt: buildDailyBriefPrompt({ profile, weather, localDate }),
-    imageBase64: photo.imageBase64,
-    mimeType: photo.mimeType,
-    preferredLocale: profile.preferred_locale,
-  })
+  try {
+    return await callGeminiText({
+      env,
+      prompt: buildDailyBriefPrompt({ profile, weather, localDate }),
+      imageBase64: photo.imageBase64,
+      mimeType: photo.mimeType,
+      preferredLocale: profile.preferred_locale,
+    })
+  } catch (error) {
+    if (error instanceof Error && isRecoverableGeminiBriefError(error.message)) {
+      return buildFallbackDailyBrief({ profile, weather })
+    }
+
+    throw error
+  }
 }
 
 const sendDailyStyleEmail = async (
@@ -1238,6 +1343,17 @@ const sendDailyStyleEmail = async (
     brief,
   ].join('|'))
 
+  const referencePhoto = profile.photo_object_key
+    ? await readProfilePhotoInlineData({
+        env,
+        objectKey: profile.photo_object_key,
+      }).catch(() => null)
+    : null
+  const referencePhotoCid = referencePhoto ? 'daily-brief-reference-photo' : undefined
+  const referencePhotoExtension = referencePhoto
+    ? getFileExtension(referencePhoto.mimeType)
+    : 'jpg'
+
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -1254,6 +1370,7 @@ const sendDailyStyleEmail = async (
         locationName: profile.location_name,
         weatherSummary: weather.summary,
         brief,
+        referencePhotoCid,
       }),
       text: buildDailyEmailText({
         preferredLocale: profile.preferred_locale,
@@ -1262,6 +1379,15 @@ const sendDailyStyleEmail = async (
         brief,
       }),
       reply_to: env.RESEND_REPLY_TO ? [env.RESEND_REPLY_TO] : undefined,
+      attachments: referencePhoto
+        ? [
+            {
+              content: referencePhoto.imageBase64,
+              filename: 'daily-brief-reference-' + localDate + '.' + referencePhotoExtension,
+              contentId: referencePhotoCid,
+            },
+          ]
+        : undefined,
       tags: [
         { name: 'delivery', value: 'daily_style' },
         { name: 'local_date', value: localDate },

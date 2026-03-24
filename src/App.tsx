@@ -38,6 +38,16 @@ type CheckoutResponse = {
   error?: string
 }
 
+type BillingSubscriptionSnapshot = {
+  id?: string
+  status?: string
+  cancelAtPeriodEnd?: boolean
+  currentPeriodEnd?: string | null
+  currentPeriodStart?: string | null
+  trialEndsAt?: string | null
+  endsAt?: string | null
+}
+
 type CheckoutStatusResponse = {
   status?: string
   checkoutKind?: 'one_time' | 'subscription'
@@ -46,6 +56,7 @@ type CheckoutStatusResponse = {
   customerEmail?: string
   hasAccess?: boolean
   subscriptionStatus?: string
+  subscription?: BillingSubscriptionSnapshot | null
   error?: string
 }
 
@@ -53,7 +64,18 @@ type BillingAccessResponse = {
   hasAccess?: boolean
   subscriptionStatus?: string
   customerEmail?: string
+  subscription?: BillingSubscriptionSnapshot | null
   error?: string
+}
+
+type CustomerPortalSessionResponse = {
+  url?: string
+  customerEmail?: string
+  error?: string
+}
+
+type CancelSubscriptionResponse = BillingAccessResponse & {
+  message?: string
 }
 
 type SendReportEmailResponse = {
@@ -423,6 +445,19 @@ const localeCopy = {
     stylePromptTitle: 'AI 프롬프트 유틸리티',
     stylePromptDescription:
       'ChatGPT, Gemini, Stitch 같은 생성형 AI에서 추가 룩 이미지를 만들 수 있도록 프롬프트를 복사합니다.',
+    styleAdoptPhotoTitle: '이 사진을 아침 브리프 기준 사진으로 저장',
+    styleAdoptPhotoDescription:
+      '방금 분석에 사용한 STYLE 사진을 매일 아침 스타일 브리프의 기준 사진으로 채택합니다. 위치만 저장되어 있으면 바로 적용됩니다.',
+    styleAdoptPhotoAction: '이 사진 기준으로 저장하기',
+    styleAdoptPhotoLoading: '기준 사진으로 저장 중...',
+    styleAdoptPhotoSuccess:
+      '이 STYLE 사진을 아침 브리프 기준 사진으로 저장했습니다.',
+    styleAdoptPhotoMissingLocation:
+      '먼저 account 페이지에서 도시 또는 현재 위치를 저장해 주세요. 그 다음 이 사진을 기준 사진으로 채택할 수 있습니다.',
+    styleAdoptPhotoMissingImage:
+      '먼저 STYLE 분석에 사용할 사진을 업로드해 주세요.',
+    styleAdoptPhotoMissingMetrics:
+      '기준 사진으로 저장하려면 키와 몸무게 정보가 필요합니다.',
     hairUploadTitle: '내 사진 업로드',
     hairUploadHelper:
       '드래그 앤 드롭하거나 탭해서 선명한 인물 사진을 업로드하세요.',
@@ -458,21 +493,37 @@ const localeCopy = {
     accountPageTag: 'ACCOUNT',
     accountPageTitle: '계정과 일일 스타일 구독 관리',
     accountPageBody:
-      '단건 결제는 STYLE과 HAIR에서 각각 진행되고, 여기 구독은 매일 아침 날씨 기반 스타일 브리프용으로만 관리됩니다.',
+      '이 계정 ID를 기준으로 Polar 구독이 연결됩니다. 단건 결제는 그대로 유지되고, 활성 무료 체험 또는 구독이 있으면 STYLE, HAIR, 매일 아침 브리프가 함께 열립니다.',
     accountPageOrderTitle: '추천 순서',
-    accountPageOrderStep1: '같은 이메일 계정으로 로그인 상태를 확인합니다.',
-    accountPageOrderStep2: '구독 섹션에서 7일 무료 체험 또는 월 구독 상태를 확인합니다.',
-    accountPageOrderStep3: '키, 몸무게, 위치, 기준 사진을 저장해 아침 브리프를 준비합니다.',
-    accountPageOrderStep4: '비밀번호 변경과 계정 탈퇴는 마지막 섹션에서 관리합니다.',
+    accountPageOrderStep1: '지금 로그인한 계정이 이 구독을 소유할 계정인지 확인합니다.',
+    accountPageOrderStep2: '구독 섹션에서 Polar 결제 이메일과 무료 체험 또는 월 구독 상태를 확인합니다.',
+    accountPageOrderStep3: '기준 사진, 키, 몸무게, 위치를 저장해 아침 브리프를 준비합니다.',
+    accountPageOrderStep4: '필요하면 구독 관리 또는 해지를 진행하고, 비밀번호 변경과 탈퇴는 마지막에 처리합니다.',
     accountSubscriptionTitle: '매일 아침 스타일 브리프 구독',
     accountSubscriptionBody:
-      '이 구독은 매일 아침 6시에 날씨와 저장된 프로필을 바탕으로 스타일 브리프를 보내는 용도입니다.',
+      '활성 무료 체험 또는 구독이 있으면 매일 아침 6시 브리프와 STYLE, HAIR 생성이 함께 열립니다.',
     accountSubscriptionSeparateNote:
-      'STYLE 체형 보고서와 HAIR 추천은 이 구독에 포함되지 않으며, 각 페이지에서 단건 결제로 별도 진행됩니다.',
+      '단건 결제는 그대로 유지됩니다. 구독이 없어도 STYLE과 HAIR는 개별 결제로 사용할 수 있고, 매일 아침 브리프는 구독 기반으로만 발송됩니다.',
     accountSubscriptionSummaryLocked: '아직 무료 체험 또는 구독이 활성화되지 않았습니다.',
+    accountBillingEmailLabel: 'Polar 결제 이메일',
+    accountSubscriptionPlanLabel: '현재 구독 상태',
+    accountSubscriptionManageAction: 'Polar에서 결제 관리하기',
+    accountSubscriptionManageLoading: '구독 관리 페이지 준비 중...',
+    accountSubscriptionCancelAction: '이번 주기 종료 시 해지 예약',
+    accountSubscriptionCancelLoading: '구독 해지 예약 중...',
+    accountSubscriptionCancelPrompt: '현재 결제 주기 종료 시점에 구독을 해지할까요?',
+    accountSubscriptionCancelScheduled: '현재 주기 종료 후 해지 예정',
+    accountSubscriptionCancelNote: '구독 해지가 예약되어 있습니다. 현재 주기 종료 전까지는 액세스가 유지됩니다.',
+    accountSubscriptionCurrentPeriodEndLabel: '현재 주기 종료',
+    accountSubscriptionTrialEndsLabel: '무료 체험 종료',
+    accountSubscriptionManageHint: '카드 변경, 영수증 확인, 해지 철회는 Polar 고객 포털에서 이어서 할 수 있습니다.',
     accountProfileTitle: '내 정보 및 브리프 설정',
+    accountProfileIdentityTitle: '로그인 계정',
+    accountProfileMetricsTitle: '브리프 기준 정보',
+    accountProfileDeliveryTitle: '발송 일정과 위치',
+    accountProfilePhotoTitle: '브리프 기준 사진',
     accountProfileBody:
-      '현재 로그인 계정과 일일 스타일 브리프에 쓰는 프로필 정보를 정리합니다.',
+      '로그인 계정 정보와 매일 아침 브리프에 쓰는 기준 정보를 한 번에 정리합니다.',
     accountEmailLabel: '이메일',
     accountProviderLabel: '로그인 방식',
     accountUserIdLabel: '사용자 ID',
@@ -676,6 +727,19 @@ const localeCopy = {
     stylePromptTitle: 'AI Prompt Utility',
     stylePromptDescription:
       'Copy a prompt for ChatGPT, Gemini, Stitch, or another generative AI tool to create more style visuals.',
+    styleAdoptPhotoTitle: 'Use this photo for the daily morning brief',
+    styleAdoptPhotoDescription:
+      'Save the STYLE photo you just analyzed as the reference photo for your daily weather-based style brief. If your location is already saved, it applies immediately.',
+    styleAdoptPhotoAction: 'Save as daily brief photo',
+    styleAdoptPhotoLoading: 'Saving as the reference photo...',
+    styleAdoptPhotoSuccess:
+      'This STYLE photo has been saved as your daily brief reference photo.',
+    styleAdoptPhotoMissingLocation:
+      'Please save your city or current location on the account page first. Then this photo can be adopted as the daily brief reference photo.',
+    styleAdoptPhotoMissingImage:
+      'Please upload the STYLE photo first.',
+    styleAdoptPhotoMissingMetrics:
+      'Height and weight are required before this photo can be saved as your daily brief reference photo.',
     hairUploadTitle: 'Upload Your Photo',
     hairUploadHelper:
       'Drag and drop or tap to upload a clear portrait for AI hair analysis.',
@@ -712,21 +776,37 @@ const localeCopy = {
     accountPageTag: 'ACCOUNT',
     accountPageTitle: 'Manage your account and daily style subscription',
     accountPageBody:
-      'One-time purchases stay on the STYLE and HAIR pages. This page only manages the daily weather-based style brief subscription.',
+      'This signed-in account ID owns the Polar subscription. One-time purchases still remain available, and an active trial or subscription unlocks STYLE, HAIR, and the daily morning brief together.',
     accountPageOrderTitle: 'Recommended order',
-    accountPageOrderStep1: 'Confirm you are signed in with the same email you will use for checkout.',
-    accountPageOrderStep2: 'Check the subscription section for the 7-day free trial or active monthly plan.',
-    accountPageOrderStep3: 'Save height, weight, location, and a reference photo for the morning brief.',
-    accountPageOrderStep4: 'Manage password updates and account deletion last.',
+    accountPageOrderStep1: 'Confirm that the signed-in account is the one that should own the subscription.',
+    accountPageOrderStep2: 'Check the subscription section for the Polar billing email and the current free-trial or monthly status.',
+    accountPageOrderStep3: 'Save the reference photo, height, weight, and location for the morning brief.',
+    accountPageOrderStep4: 'Use subscription management or cancellation when needed, and keep password or account deletion for last.',
     accountSubscriptionTitle: 'Daily morning style brief subscription',
     accountSubscriptionBody:
-      'This subscription is only for the daily 6:00 AM weather-based style brief built from your saved profile.',
+      'An active free trial or subscription unlocks the 6:00 AM morning brief together with STYLE and HAIR generation.',
     accountSubscriptionSeparateNote:
-      'The STYLE body report and HAIR recommendation are not included here. They remain separate one-time purchases on their own pages.',
+      'One-time checkout remains available. STYLE and HAIR can still be purchased separately, while the daily morning brief is sent only while the subscription side stays active.',
     accountSubscriptionSummaryLocked: 'No free trial or subscription is active yet.',
+    accountBillingEmailLabel: 'Polar billing email',
+    accountSubscriptionPlanLabel: 'Current subscription state',
+    accountSubscriptionManageAction: 'Manage billing in Polar',
+    accountSubscriptionManageLoading: 'Opening the subscription manager...',
+    accountSubscriptionCancelAction: 'Schedule cancellation at period end',
+    accountSubscriptionCancelLoading: 'Scheduling the cancellation...',
+    accountSubscriptionCancelPrompt: 'Schedule this subscription to cancel at the end of the current billing period?',
+    accountSubscriptionCancelScheduled: 'Cancellation scheduled at period end',
+    accountSubscriptionCancelNote: 'Cancellation is scheduled. Access stays available until the current billing period ends.',
+    accountSubscriptionCurrentPeriodEndLabel: 'Current period ends',
+    accountSubscriptionTrialEndsLabel: 'Free trial ends',
+    accountSubscriptionManageHint: 'Use the Polar customer portal for card updates, receipts, or reversing a cancellation.',
     accountProfileTitle: 'My details and brief settings',
+    accountProfileIdentityTitle: 'Signed-in account',
+    accountProfileMetricsTitle: 'Brief inputs',
+    accountProfileDeliveryTitle: 'Delivery schedule and location',
+    accountProfilePhotoTitle: 'Brief reference photo',
     accountProfileBody:
-      'Review the signed-in account and the saved profile used for daily morning delivery.',
+      'Review the signed-in account and the saved profile used for daily morning delivery in one place.',
     accountEmailLabel: 'Email',
     accountProviderLabel: 'Sign-in method',
     accountUserIdLabel: 'User ID',
@@ -1178,9 +1258,21 @@ function App() {
   )
   const [purchaseOrderId, setPurchaseOrderId] = useState(getInitialPurchaseOrderId)
   const [purchaseEmail, setPurchaseEmail] = useState(getInitialPurchaseEmail)
+  const [billingCustomerEmail, setBillingCustomerEmail] = useState('')
+  const [billingSubscriptionId, setBillingSubscriptionId] = useState('')
+  const [billingSubscriptionCurrentPeriodEnd, setBillingSubscriptionCurrentPeriodEnd] = useState('')
+  const [billingSubscriptionTrialEndsAt, setBillingSubscriptionTrialEndsAt] = useState('')
+  const [billingSubscriptionCancelAtPeriodEnd, setBillingSubscriptionCancelAtPeriodEnd] = useState(false)
+  const [subscriptionActionMessage, setSubscriptionActionMessage] = useState('')
+  const [subscriptionActionTone, setSubscriptionActionTone] = useState<StatusTone>('success')
+  const [isSubscriptionPortalLoading, setIsSubscriptionPortalLoading] = useState(false)
+  const [isSubscriptionCanceling, setIsSubscriptionCanceling] = useState(false)
   const [styleEmailMessage, setStyleEmailMessage] = useState('')
   const [styleEmailTone, setStyleEmailTone] = useState<StatusTone>('success')
   const [isStyleEmailSending, setIsStyleEmailSending] = useState(false)
+  const [styleAdoptMessage, setStyleAdoptMessage] = useState('')
+  const [styleAdoptTone, setStyleAdoptTone] = useState<StatusTone>('success')
+  const [isStylePhotoAdopting, setIsStylePhotoAdopting] = useState(false)
   const [hairEmailMessage, setHairEmailMessage] = useState('')
   const [hairEmailTone, setHairEmailTone] = useState<StatusTone>('success')
   const [isHairEmailSending, setIsHairEmailSending] = useState(false)
@@ -1208,6 +1300,14 @@ function App() {
     customerProfileNextDeliveryAt,
     preferredLocale,
   )
+  const billingCurrentPeriodEndDisplay = formatAccountTimestamp(
+    billingSubscriptionCurrentPeriodEnd,
+    preferredLocale,
+  )
+  const billingTrialEndsDisplay = formatAccountTimestamp(
+    billingSubscriptionTrialEndsAt,
+    preferredLocale,
+  )
   const accountProfileSummary =
     customerProfileLocationName
       ? [
@@ -1220,6 +1320,28 @@ function App() {
         copy.accountProfileBody
   const accountPasswordSummary = passwordMessage || copy.accountPasswordBody
   const accountDeleteSummary = deleteMessage || copy.accountDeleteBody
+  const linkedBillingEmail = billingCustomerEmail || authenticatedEmail
+  const subscriptionStatusTitle =
+    checkoutStatus === 'pending'
+      ? copy.checkoutPendingTitle
+      : billingAccessPhase === 'trialing'
+        ? copy.checkoutTrialTitle
+        : billingAccessPhase === 'active'
+          ? billingSubscriptionCancelAtPeriodEnd
+            ? copy.accountSubscriptionCancelScheduled
+            : copy.checkoutVerifiedTitle
+          : copy.checkoutLockedTitle
+  const subscriptionStatusBody =
+    checkoutErrorMessage ||
+    (checkoutStatus === 'pending'
+      ? checkoutStatusMessage || copy.checkoutPendingBody
+      : billingAccessPhase === 'trialing'
+        ? copy.checkoutTrialBody
+        : billingAccessPhase === 'active'
+          ? billingSubscriptionCancelAtPeriodEnd
+            ? copy.accountSubscriptionCancelNote
+            : copy.checkoutVerifiedBody
+          : copy.checkoutLockedBody)
   const accountSubscriptionSummary =
     checkoutErrorMessage ||
     (!isAuthenticated
@@ -1229,12 +1351,10 @@ function App() {
         : billingAccessPhase === 'trialing'
           ? copy.checkoutTrialStatus
           : billingAccessPhase === 'active'
-            ? copy.checkoutVerifiedStatus
+            ? billingSubscriptionCancelAtPeriodEnd
+              ? copy.accountSubscriptionCancelScheduled
+              : copy.checkoutVerifiedStatus
             : copy.accountSubscriptionSummaryLocked)
-  const checkoutActiveBody =
-    billingAccessPhase === 'trialing'
-      ? copy.checkoutTrialBody
-      : copy.checkoutVerifiedBody
   const hasGenerationAccess =
     isPurchaseVerified ||
     billingAccessPhase === 'trialing' ||
@@ -1259,6 +1379,31 @@ function App() {
     setCustomerProfileMessageTone(tone)
     setCustomerProfileMessage(message)
   }
+
+  const applyBillingSnapshot = useCallback(
+    (
+      snapshot:
+        | BillingAccessResponse
+        | CheckoutStatusResponse
+        | CancelSubscriptionResponse
+        | null,
+    ) => {
+      const nextEmail = snapshot?.customerEmail?.trim() || ''
+      const nextPhase = normalizeBillingAccessPhase(
+        snapshot?.subscriptionStatus,
+        Boolean(snapshot?.hasAccess),
+      )
+      const nextSubscription = snapshot?.subscription ?? null
+
+      setBillingAccessPhase(nextPhase)
+      setBillingCustomerEmail(nextEmail)
+      setBillingSubscriptionId(nextSubscription?.id?.trim() || '')
+      setBillingSubscriptionCurrentPeriodEnd(nextSubscription?.currentPeriodEnd?.trim?.() || nextSubscription?.currentPeriodEnd || '')
+      setBillingSubscriptionTrialEndsAt(nextSubscription?.trialEndsAt?.trim?.() || nextSubscription?.trialEndsAt || '')
+      setBillingSubscriptionCancelAtPeriodEnd(Boolean(nextSubscription?.cancelAtPeriodEnd))
+    },
+    [],
+  )
 
   const toggleAccountSection = useCallback((section: AccountSection) => {
     setOpenAccountSection((current) => (current === section ? null : section))
@@ -1380,6 +1525,12 @@ function App() {
 
     setIsPurchaseVerified(false)
     setBillingAccessPhase('inactive')
+    setBillingCustomerEmail('')
+    setBillingSubscriptionId('')
+    setBillingSubscriptionCurrentPeriodEnd('')
+    setBillingSubscriptionTrialEndsAt('')
+    setBillingSubscriptionCancelAtPeriodEnd(false)
+    setSubscriptionActionMessage('')
     setPurchaseOrderId('')
     setPurchaseEmail('')
     setCheckoutStatus('idle')
@@ -2329,7 +2480,7 @@ function App() {
         )
         const nextEmail = data?.customerEmail?.trim() || authenticatedEmail
 
-        setBillingAccessPhase(nextPhase)
+        applyBillingSnapshot(data)
         setCheckoutErrorMessage('')
 
         if (hasAccess) {
@@ -2361,6 +2512,7 @@ function App() {
       }
     },
     [
+      applyBillingSnapshot,
       authenticatedEmail,
       copy.checkoutError,
       copy.checkoutTrialBody,
@@ -2373,6 +2525,105 @@ function App() {
       preferredLocale,
     ],
   )
+
+  const handleOpenSubscriptionPortal = async () => {
+    if (!isAuthenticated) {
+      setAuthFeedback('error', copy.authSessionRequired)
+      setView('account')
+      return
+    }
+
+    try {
+      setIsSubscriptionPortalLoading(true)
+      setSubscriptionActionMessage('')
+
+      const response = await fetchWithAuth('/api/customer-portal-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          preferredLocale,
+          returnUrl: window.location.origin + window.location.pathname + '#account',
+        }),
+      })
+
+      const data = await parseResponseJson<CustomerPortalSessionResponse>(response)
+
+      if (!response.ok || !data?.url) {
+        throw new Error(data?.error ?? copy.checkoutError)
+      }
+
+      if (data.customerEmail?.trim()) {
+        setBillingCustomerEmail(data.customerEmail.trim())
+      }
+
+      window.location.href = data.url
+    } catch (error) {
+      setSubscriptionActionTone('error')
+      setSubscriptionActionMessage(
+        error instanceof Error ? error.message : copy.checkoutError,
+      )
+    } finally {
+      setIsSubscriptionPortalLoading(false)
+    }
+  }
+
+  const handleCancelSubscription = async () => {
+    if (!isAuthenticated) {
+      setAuthFeedback('error', copy.authSessionRequired)
+      setView('account')
+      return
+    }
+
+    if (!billingSubscriptionId) {
+      setSubscriptionActionTone('error')
+      setSubscriptionActionMessage(copy.accountSubscriptionSummaryLocked)
+      return
+    }
+
+    if (!window.confirm(copy.accountSubscriptionCancelPrompt)) {
+      return
+    }
+
+    try {
+      setIsSubscriptionCanceling(true)
+      setSubscriptionActionMessage('')
+
+      const response = await fetchWithAuth('/api/cancel-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          preferredLocale,
+        }),
+      })
+
+      const data = await parseResponseJson<CancelSubscriptionResponse>(response)
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? copy.accountSubscriptionCancelNote)
+      }
+
+      applyBillingSnapshot(data)
+      setSubscriptionActionTone('success')
+      setSubscriptionActionMessage(
+        data?.message ?? copy.accountSubscriptionCancelNote,
+      )
+      setCheckoutStatus(data?.hasAccess ? 'verified' : 'idle')
+      setCheckoutStatusMessage(
+        data?.hasAccess ? copy.accountSubscriptionCancelNote : '',
+      )
+    } catch (error) {
+      setSubscriptionActionTone('error')
+      setSubscriptionActionMessage(
+        error instanceof Error ? error.message : copy.accountSubscriptionCancelNote,
+      )
+    } finally {
+      setIsSubscriptionCanceling(false)
+    }
+  }
 
   const toggleTheme = () => {
     setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))
@@ -2449,6 +2700,7 @@ function App() {
       setStyleAssetMessage('')
       setStyleAssetAction('idle')
       setStyleEmailMessage('')
+      setStyleAdoptMessage('')
       setView('style')
       setStylePhotoPreview(payload.previewUrl)
       setStylePhotoName(payload.photoName)
@@ -2799,6 +3051,95 @@ function App() {
 
   const copyStylePrompt = async () => {
     await copyText(stylePrompt, setStyleCopyMessage, setStyleCopyMessage)
+  }
+
+  const adoptStylePhotoForDailyBrief = async () => {
+    if (!isAuthenticated) {
+      setAuthFeedback('error', copy.authSessionRequired)
+      setView('account')
+      return
+    }
+
+    if (!stylePhotoFile) {
+      setStyleAdoptTone('error')
+      setStyleAdoptMessage(copy.styleAdoptPhotoMissingImage)
+      return
+    }
+
+    const nextHeight = customerProfileHeight.trim() || height.trim()
+    const nextWeight = customerProfileWeight.trim() || weight.trim()
+    const hasDirectLocation =
+      typeof customerProfileLatitude === 'number' &&
+      typeof customerProfileLongitude === 'number' &&
+      customerProfileTimezone.trim()
+    const nextLocationQuery = customerProfileLocationQuery.trim()
+
+    if (!nextHeight || !nextWeight) {
+      setStyleAdoptTone('error')
+      setStyleAdoptMessage(copy.styleAdoptPhotoMissingMetrics)
+      return
+    }
+
+    if (!hasDirectLocation && !nextLocationQuery) {
+      setStyleAdoptTone('error')
+      setStyleAdoptMessage(copy.styleAdoptPhotoMissingLocation)
+      return
+    }
+
+    try {
+      setIsStylePhotoAdopting(true)
+      setStyleAdoptMessage('')
+
+      const formData = new FormData()
+      formData.set('heightCm', nextHeight)
+      formData.set('weightKg', nextWeight)
+      formData.set('locationQuery', nextLocationQuery)
+      formData.set(
+        'dailyEmailEnabled',
+        customerDailyEmailEnabled ? 'true' : 'false',
+      )
+      formData.set('preferredLocale', preferredLocale)
+
+      if (hasDirectLocation) {
+        formData.set('latitude', String(customerProfileLatitude))
+        formData.set('longitude', String(customerProfileLongitude))
+        formData.set('timezone', customerProfileTimezone.trim())
+        formData.set(
+          'locationName',
+          customerProfileLocationName.trim() ||
+            customerProfileLocationQuery.trim() ||
+            copy.accountProfileCurrentLocation,
+        )
+      }
+
+      const uploadFile = await compressImageForUpload(stylePhotoFile)
+      formData.set('photo', uploadFile)
+
+      const response = await fetchWithAuth(
+        '/api/customer-profile?preferred_locale=' +
+          encodeURIComponent(preferredLocale),
+        {
+          method: 'POST',
+          body: formData,
+        },
+      )
+      const data = await parseResponseJson<CustomerProfileResponse>(response)
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? copy.accountProfileSaveError)
+      }
+
+      await applyCustomerProfile(data?.profile ?? null)
+      setStyleAdoptTone('success')
+      setStyleAdoptMessage(data?.message ?? copy.styleAdoptPhotoSuccess)
+    } catch (error) {
+      setStyleAdoptTone('error')
+      setStyleAdoptMessage(
+        error instanceof Error ? error.message : copy.accountProfileSaveError,
+      )
+    } finally {
+      setIsStylePhotoAdopting(false)
+    }
   }
 
   const copyHairPrompt = async () => {
@@ -3225,7 +3566,7 @@ function App() {
           hasAccess,
         )
 
-        setBillingAccessPhase(nextPhase)
+        applyBillingSnapshot(data)
         setActiveCheckoutKind(null)
         setIsCheckoutLoading(false)
         setCheckoutErrorMessage('')
@@ -3263,6 +3604,7 @@ function App() {
       isCancelled = true
     }
   }, [
+    applyBillingSnapshot,
     authenticatedEmail,
     copy.authSessionRequired,
     copy.checkoutError,
@@ -3586,18 +3928,17 @@ function App() {
       return null
     }
 
-    const statusMessage =
-      checkoutErrorMessage ||
-      (checkoutStatus === 'pending'
-        ? checkoutStatusMessage || copy.checkoutPendingBody
-        : billingAccessPhase === 'trialing' || billingAccessPhase === 'active'
-          ? checkoutActiveBody
-          : copy.checkoutLockedBody)
-
     return (
-      <div className="billing-status-card">
-        <strong>{copy.checkoutStatusLabel}</strong>
-        <p className="rich-paragraph">{statusMessage}</p>
+      <div
+        className="billing-status-card"
+        data-state={billingAccessPhase}
+        data-cancel={billingSubscriptionCancelAtPeriodEnd ? 'true' : 'false'}
+      >
+        <div className="billing-status-head">
+          <strong>{copy.accountSubscriptionPlanLabel}</strong>
+          <span className="account-status-pill">{subscriptionStatusTitle}</span>
+        </div>
+        <p className="rich-paragraph">{subscriptionStatusBody}</p>
       </div>
     )
   }
@@ -3634,28 +3975,84 @@ function App() {
           <div className="account-accordion-panel" id="account-subscription-panel">
             <div className="account-accordion-panel-inner">
               <div className="account-accordion-content">
-                <p className="account-inline-note">{copy.accountSubscriptionBody}</p>
                 {renderCheckoutStatusCard()}
+                <p className="account-inline-note">{copy.accountSubscriptionBody}</p>
+                <div className="account-info-grid">
+                  <p className="delivery-target">
+                    <strong>{copy.accountBillingEmailLabel}</strong>
+                    <span>{linkedBillingEmail || copy.accountUnavailable}</span>
+                  </p>
+                  <p className="delivery-target">
+                    <strong>{copy.accountSubscriptionPlanLabel}</strong>
+                    <span>{accountSubscriptionSummary}</span>
+                  </p>
+                  {billingTrialEndsDisplay ? (
+                    <p className="delivery-target">
+                      <strong>{copy.accountSubscriptionTrialEndsLabel}</strong>
+                      <span>{billingTrialEndsDisplay}</span>
+                    </p>
+                  ) : null}
+                  {billingCurrentPeriodEndDisplay ? (
+                    <p className="delivery-target">
+                      <strong>{copy.accountSubscriptionCurrentPeriodEndLabel}</strong>
+                      <span>{billingCurrentPeriodEndDisplay}</span>
+                    </p>
+                  ) : null}
+                </div>
                 <p className="account-inline-note">{copy.accountSubscriptionSeparateNote}</p>
-                {billingAccessPhase === 'inactive' && checkoutStatus !== 'pending' ? (
+                {subscriptionActionMessage ? (
+                  <p className={`status-message ${subscriptionActionTone}`}>
+                    {subscriptionActionMessage}
+                  </p>
+                ) : null}
+                <div className="account-action-grid">
+                  {billingAccessPhase === 'inactive' && checkoutStatus !== 'pending' ? (
+                    <button
+                      className="utility-button checkout-button"
+                      disabled={isCheckoutLoading && activeCheckoutKind === 'subscription'}
+                      onClick={() => {
+                        void startCheckout('subscription')
+                      }}
+                      type="button"
+                    >
+                      <SparkleIcon className="button-icon" />
+                      <span>
+                        {isCheckoutLoading && activeCheckoutKind === 'subscription'
+                          ? copy.checkoutLoading
+                          : copy.checkoutButton}
+                      </span>
+                    </button>
+                  ) : null}
                   <button
-                    className="utility-button checkout-button"
-                    disabled={
-                      isCheckoutLoading && activeCheckoutKind === 'subscription'
-                    }
+                    className="utility-button"
+                    disabled={isSubscriptionPortalLoading}
                     onClick={() => {
-                      void startCheckout('subscription')
+                      void handleOpenSubscriptionPortal()
                     }}
                     type="button"
                   >
-                    <SparkleIcon className="button-icon" />
-                    <span>
-                      {isCheckoutLoading && activeCheckoutKind === 'subscription'
-                        ? copy.checkoutLoading
-                        : copy.checkoutButton}
-                    </span>
+                    {isSubscriptionPortalLoading
+                      ? copy.accountSubscriptionManageLoading
+                      : copy.accountSubscriptionManageAction}
                   </button>
-                ) : null}
+                  {(billingAccessPhase === 'trialing' || billingAccessPhase === 'active') &&
+                  !billingSubscriptionCancelAtPeriodEnd &&
+                  billingSubscriptionId ? (
+                    <button
+                      className="utility-button"
+                      disabled={isSubscriptionCanceling}
+                      onClick={() => {
+                        void handleCancelSubscription()
+                      }}
+                      type="button"
+                    >
+                      {isSubscriptionCanceling
+                        ? copy.accountSubscriptionCancelLoading
+                        : copy.accountSubscriptionCancelAction}
+                    </button>
+                  ) : null}
+                </div>
+                <p className="account-inline-note">{copy.accountSubscriptionManageHint}</p>
               </div>
             </div>
           </div>
@@ -3686,27 +4083,37 @@ function App() {
           <div className="account-accordion-panel" id="account-profile-panel">
             <div className="account-accordion-panel-inner">
               <div className="account-accordion-content">
-                <div className="account-info-grid">
-                  <p className="delivery-target">
-                    <strong>{copy.accountEmailLabel}</strong>
-                    <span>{authenticatedEmail || copy.accountUnavailable}</span>
-                  </p>
-                  <p className="delivery-target">
-                    <strong>{copy.accountProviderLabel}</strong>
-                    <span>{authProvider || copy.accountUnavailable}</span>
-                  </p>
-                  <p className="delivery-target">
-                    <strong>{copy.accountCreatedAtLabel}</strong>
-                    <span>{accountCreatedAt || copy.accountUnavailable}</span>
-                  </p>
-                </div>
-                <p className="account-inline-note">
-                  {isCustomerProfileLoading
-                    ? copy.accountProfileLoading
-                    : copy.accountProfileSetupNote}
-                </p>
                 <form className="stack-form" onSubmit={handleCustomerProfileSave}>
-                  <div className="account-info-grid">
+                  <section className="account-block-card">
+                    <div className="account-block-heading">
+                      <h5>{copy.accountProfileIdentityTitle}</h5>
+                      <p>{copy.accountProfileBody}</p>
+                    </div>
+                    <div className="account-info-grid">
+                      <p className="delivery-target">
+                        <strong>{copy.accountEmailLabel}</strong>
+                        <span>{authenticatedEmail || copy.accountUnavailable}</span>
+                      </p>
+                      <p className="delivery-target">
+                        <strong>{copy.accountProviderLabel}</strong>
+                        <span>{authProvider || copy.accountUnavailable}</span>
+                      </p>
+                      <p className="delivery-target">
+                        <strong>{copy.accountCreatedAtLabel}</strong>
+                        <span>{accountCreatedAt || copy.accountUnavailable}</span>
+                      </p>
+                    </div>
+                  </section>
+
+                  <section className="account-block-card">
+                    <div className="account-block-heading">
+                      <h5>{copy.accountProfileMetricsTitle}</h5>
+                      <p>
+                        {isCustomerProfileLoading
+                          ? copy.accountProfileLoading
+                          : copy.accountProfileSetupNote}
+                      </p>
+                    </div>
                     <label className="metric-field">
                       <span>{copy.accountProfileHeightLabel}</span>
                       <div className="auth-input-wrap">
@@ -3732,109 +4139,123 @@ function App() {
                         />
                       </div>
                     </label>
-                  </div>
-                  <label className="metric-field">
-                    <span>{copy.accountProfileLocationLabel}</span>
-                    <div className="auth-input-wrap">
-                      <input
-                        autoComplete="address-level2"
-                        onChange={handleCustomerProfileLocationQueryChange}
-                        placeholder={copy.accountProfileLocationPlaceholder}
-                        type="text"
-                        value={customerProfileLocationQuery}
-                      />
-                    </div>
-                  </label>
-                  <div className="auth-action-row">
-                    <button
-                      className="utility-button"
-                      disabled={isLocationDetecting || isCustomerProfileLoading || isCustomerProfileSaving}
-                      onClick={() => {
-                        void handleUseCurrentLocation()
-                      }}
-                      type="button"
-                    >
-                      {isLocationDetecting
-                        ? copy.accountProfileLocationAutoLoading
-                        : copy.accountProfileLocationAutoAction}
-                    </button>
-                  </div>
-                  <div className="account-info-grid">
-                    <p className="delivery-target">
-                      <strong>{copy.accountProfileResolvedLocationLabel}</strong>
-                      <span>{customerProfileLocationName || copy.accountUnavailable}</span>
-                    </p>
-                    <p className="delivery-target">
-                      <strong>{copy.accountProfileTimezoneLabel}</strong>
-                      <span>{customerProfileTimezone || copy.accountUnavailable}</span>
-                    </p>
-                    <p className="delivery-target">
-                      <strong>{copy.accountProfileScheduleLabel}</strong>
-                      <span>
-                        {customerDailyEmailEnabled
-                          ? copy.accountProfileScheduleEnabled
-                          : copy.accountProfileSchedulePaused}
-                      </span>
-                    </p>
-                    <p className="delivery-target">
-                      <strong>{copy.accountProfileNextDeliveryLabel}</strong>
-                      <span>
-                        {customerProfileNextDeliveryDisplay ||
-                          copy.accountProfileNextDeliveryEmpty}
-                      </span>
-                    </p>
-                    <p className="delivery-target">
-                      <strong>{copy.accountProfileLastDeliveryLabel}</strong>
-                      <span>
-                        {customerProfileLastDeliveryDisplay ||
-                          copy.accountProfileLastDeliveryEmpty}
-                      </span>
-                    </p>
-                  </div>
-                  <div
-                    className="account-profile-photo-layout"
-                    data-photo-version={customerProfileUpdatedAt || 'none'}
-                  >
-                    <div className="account-profile-photo-frame">
-                      {customerProfilePhotoPreview ? (
-                        <img
-                          alt={copy.accountProfilePhotoSaved}
-                          src={customerProfilePhotoPreview}
-                        />
-                      ) : (
-                        <div className="account-profile-photo-placeholder">
-                          <span>{copy.accountProfilePhotoLabel}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="account-profile-photo-copy">
-                      <strong>{copy.accountProfilePhotoLabel}</strong>
-                      <p>{copy.accountProfilePhotoHint}</p>
-                      <label className="utility-button account-file-button">
-                        <input
-                          accept="image/*"
-                          className="account-file-input"
-                          onChange={handleCustomerProfilePhotoChange}
-                          type="file"
-                        />
-                        <span>{copy.accountProfilePhotoAction}</span>
-                      </label>
-                      <p className="account-inline-note">{customerProfilePhotoName}</p>
-                    </div>
-                  </div>
-                  <label className="account-toggle-card">
-                    <div className="account-toggle-copy">
-                      <strong>{copy.accountProfileDailyToggleLabel}</strong>
+                  </section>
+
+                  <section className="account-block-card">
+                    <div className="account-block-heading">
+                      <h5>{copy.accountProfileDeliveryTitle}</h5>
                       <p>{copy.accountProfileDailyToggleHint}</p>
                     </div>
-                    <input
-                      aria-label={copy.accountProfileDailyToggleLabel}
-                      checked={customerDailyEmailEnabled}
-                      className="account-toggle-input"
-                      onChange={(event) => setCustomerDailyEmailEnabled(event.target.checked)}
-                      type="checkbox"
-                    />
-                  </label>
+                    <label className="metric-field">
+                      <span>{copy.accountProfileLocationLabel}</span>
+                      <div className="auth-input-wrap">
+                        <input
+                          autoComplete="address-level2"
+                          onChange={handleCustomerProfileLocationQueryChange}
+                          placeholder={copy.accountProfileLocationPlaceholder}
+                          type="text"
+                          value={customerProfileLocationQuery}
+                        />
+                      </div>
+                    </label>
+                    <div className="auth-action-row account-inline-actions">
+                      <button
+                        className="utility-button"
+                        disabled={isLocationDetecting || isCustomerProfileLoading || isCustomerProfileSaving}
+                        onClick={() => {
+                          void handleUseCurrentLocation()
+                        }}
+                        type="button"
+                      >
+                        {isLocationDetecting
+                          ? copy.accountProfileLocationAutoLoading
+                          : copy.accountProfileLocationAutoAction}
+                      </button>
+                    </div>
+                    <div className="account-info-grid">
+                      <p className="delivery-target">
+                        <strong>{copy.accountProfileResolvedLocationLabel}</strong>
+                        <span>{customerProfileLocationName || copy.accountUnavailable}</span>
+                      </p>
+                      <p className="delivery-target">
+                        <strong>{copy.accountProfileTimezoneLabel}</strong>
+                        <span>{customerProfileTimezone || copy.accountUnavailable}</span>
+                      </p>
+                      <p className="delivery-target">
+                        <strong>{copy.accountProfileScheduleLabel}</strong>
+                        <span>
+                          {customerDailyEmailEnabled
+                            ? copy.accountProfileScheduleEnabled
+                            : copy.accountProfileSchedulePaused}
+                        </span>
+                      </p>
+                      <p className="delivery-target">
+                        <strong>{copy.accountProfileNextDeliveryLabel}</strong>
+                        <span>
+                          {customerProfileNextDeliveryDisplay ||
+                            copy.accountProfileNextDeliveryEmpty}
+                        </span>
+                      </p>
+                      <p className="delivery-target">
+                        <strong>{copy.accountProfileLastDeliveryLabel}</strong>
+                        <span>
+                          {customerProfileLastDeliveryDisplay ||
+                            copy.accountProfileLastDeliveryEmpty}
+                        </span>
+                      </p>
+                    </div>
+                    <label className="account-toggle-card">
+                      <div className="account-toggle-copy">
+                        <strong>{copy.accountProfileDailyToggleLabel}</strong>
+                        <p>{copy.accountProfileDailyToggleHint}</p>
+                      </div>
+                      <input
+                        checked={customerDailyEmailEnabled}
+                        className="account-toggle-input"
+                        onChange={(event) => setCustomerDailyEmailEnabled(event.target.checked)}
+                        type="checkbox"
+                      />
+                    </label>
+                  </section>
+
+                  <section className="account-block-card">
+                    <div className="account-block-heading">
+                      <h5>{copy.accountProfilePhotoTitle}</h5>
+                      <p>{copy.accountProfilePhotoHint}</p>
+                    </div>
+                    <div
+                      className="account-profile-photo-layout"
+                      data-photo-version={customerProfileUpdatedAt || 'none'}
+                    >
+                      <div className="account-profile-photo-frame">
+                        {customerProfilePhotoPreview ? (
+                          <img
+                            alt={copy.accountProfilePhotoSaved}
+                            src={customerProfilePhotoPreview}
+                          />
+                        ) : (
+                          <div className="account-profile-photo-placeholder">
+                            <span>{copy.accountProfilePhotoLabel}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="account-profile-photo-copy">
+                        <strong>{copy.accountProfilePhotoLabel}</strong>
+                        <p>{copy.accountProfilePhotoHint}</p>
+                        <label className="utility-button account-file-button">
+                          <input
+                            accept="image/*"
+                            className="account-file-input"
+                            onChange={handleCustomerProfilePhotoChange}
+                            type="file"
+                          />
+                          <span>{copy.accountProfilePhotoAction}</span>
+                        </label>
+                        <p className="account-inline-note">{customerProfilePhotoName}</p>
+                      </div>
+                    </div>
+                  </section>
+
                   {customerProfileMessage ? (
                     <p className={`status-message ${customerProfileMessageTone}`}>
                       {customerProfileMessage}
@@ -4007,6 +4428,7 @@ function App() {
       </>
     )
   }
+
   const renderAccountPage = () => (
     <>
       {renderAuthCard()}
@@ -4448,6 +4870,38 @@ function App() {
                 onSave: saveStyleReportImage,
                 onShare: shareStyleReportImage,
               })}
+
+              {styleReport && stylePhotoFile && isAuthenticated ? (
+                <section className="utility-card delivery-card">
+                  <div className="utility-copy">
+                    <div className="utility-icon">
+                      <CameraIcon className="utility-icon-svg" />
+                    </div>
+                    <div>
+                      <h4>{copy.styleAdoptPhotoTitle}</h4>
+                      <p>{copy.styleAdoptPhotoDescription}</p>
+                    </div>
+                  </div>
+                  {styleAdoptMessage ? (
+                    <p className={'status-message ' + styleAdoptTone}>{styleAdoptMessage}</p>
+                  ) : null}
+                  <button
+                    className="utility-button"
+                    disabled={isStylePhotoAdopting}
+                    onClick={() => {
+                      void adoptStylePhotoForDailyBrief()
+                    }}
+                    type="button"
+                  >
+                    <CameraIcon className="button-icon" />
+                    <span>
+                      {isStylePhotoAdopting
+                        ? copy.styleAdoptPhotoLoading
+                        : copy.styleAdoptPhotoAction}
+                    </span>
+                  </button>
+                </section>
+              ) : null}
 
               {renderEmailDeliveryCard({
                 hasContent: Boolean(styleReport),

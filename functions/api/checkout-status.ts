@@ -32,6 +32,7 @@ type PolarCheckoutStatusResponse = {
   customer_email?: string
   metadata?: {
     checkout_kind?: string
+    supabase_user_id?: string
   }
   error?: {
     message?: string
@@ -106,9 +107,8 @@ export async function onRequestGet(context: PagesContext) {
   }
 
   if (
-    authenticatedUser.email &&
-    polarJson.customer_email &&
-    polarJson.customer_email.toLowerCase() !== authenticatedUser.email.toLowerCase()
+    polarJson.metadata?.supabase_user_id &&
+    polarJson.metadata.supabase_user_id !== authenticatedUser.id
   ) {
     return jsonResponse(
       {
@@ -133,6 +133,7 @@ export async function onRequestGet(context: PagesContext) {
   let hasAccess = false
   let subscriptionStatus: 'inactive' | 'trialing' | 'active' = 'inactive'
   let customerEmail = polarJson.customer_email ?? authenticatedUser.email ?? ''
+  let subscription: ReturnType<typeof deriveBillingAccessFromCustomerState>['subscription'] = null
 
   if (polarJson.status === 'succeeded' && checkoutKind === 'one_time') {
     hasAccess = productId === POLAR_ONE_TIME_PRODUCT_ID || !productId
@@ -173,6 +174,7 @@ export async function onRequestGet(context: PagesContext) {
       hasAccess = accessSnapshot.hasAccess
       subscriptionStatus = accessSnapshot.subscriptionStatus
       customerEmail = accessSnapshot.customerEmail || customerEmail
+      subscription = accessSnapshot.subscription
     }
   }
 
@@ -188,5 +190,6 @@ export async function onRequestGet(context: PagesContext) {
     customerEmail,
     hasAccess,
     subscriptionStatus,
+    subscription,
   })
 }

@@ -9,7 +9,7 @@ export type PolarApiErrorResponse = {
   } | string
 }
 
-type PolarCustomer = {
+export type PolarCustomer = {
   id?: string
   email?: string
   external_id?: string | null
@@ -25,6 +25,16 @@ type PolarCustomerListResponse = {
 type PolarCustomerStateSubscription = {
   id?: string
   status?: string
+  cancel_at_period_end?: boolean
+  cancelAtPeriodEnd?: boolean
+  current_period_end?: string | null
+  currentPeriodEnd?: string | null
+  current_period_start?: string | null
+  currentPeriodStart?: string | null
+  trial_ends_at?: string | null
+  trialEndsAt?: string | null
+  ends_at?: string | null
+  endsAt?: string | null
   product_id?: string
   product?: {
     id?: string
@@ -52,10 +62,21 @@ export type PolarCustomerStateResponse = {
   }
 }
 
+export type BillingSubscriptionSnapshot = {
+  id: string
+  status: string
+  cancelAtPeriodEnd: boolean
+  currentPeriodEnd: string | null
+  currentPeriodStart: string | null
+  trialEndsAt: string | null
+  endsAt: string | null
+}
+
 export type BillingAccessSnapshot = {
   hasAccess: boolean
   subscriptionStatus: 'inactive' | 'trialing' | 'active'
   customerEmail: string
+  subscription: BillingSubscriptionSnapshot | null
 }
 
 export const POLAR_ONE_TIME_PRODUCT_ID =
@@ -136,6 +157,28 @@ const extractSubscriptionProductIds = (
 const matchesTargetProduct = (subscription: PolarCustomerStateSubscription) =>
   extractSubscriptionProductIds(subscription).includes(POLAR_SUBSCRIPTION_PRODUCT_ID)
 
+const summarizeSubscription = (
+  subscription?: PolarCustomerStateSubscription,
+): BillingSubscriptionSnapshot | null => {
+  if (!subscription?.id) {
+    return null
+  }
+
+  return {
+    id: subscription.id,
+    status: normalizeSubscriptionStatus(subscription.status) || 'active',
+    cancelAtPeriodEnd: Boolean(
+      subscription.cancel_at_period_end ?? subscription.cancelAtPeriodEnd,
+    ),
+    currentPeriodEnd:
+      subscription.current_period_end ?? subscription.currentPeriodEnd ?? null,
+    currentPeriodStart:
+      subscription.current_period_start ?? subscription.currentPeriodStart ?? null,
+    trialEndsAt: subscription.trial_ends_at ?? subscription.trialEndsAt ?? null,
+    endsAt: subscription.ends_at ?? subscription.endsAt ?? null,
+  }
+}
+
 export const deriveBillingAccessFromCustomerState = ({
   state,
   fallbackEmail,
@@ -156,6 +199,7 @@ export const deriveBillingAccessFromCustomerState = ({
     const status = normalizeSubscriptionStatus(subscription.status)
     return status === 'active' || status === 'trialing' || !status
   })
+  const currentSubscription = trialingSubscription ?? activeSubscription ?? null
 
   const hasAccess = Boolean(trialingSubscription || activeSubscription)
   const customerEmail =
@@ -172,6 +216,7 @@ export const deriveBillingAccessFromCustomerState = ({
         ? 'active'
         : 'inactive',
     customerEmail,
+    subscription: summarizeSubscription(currentSubscription ?? undefined),
   }
 }
 
@@ -220,6 +265,54 @@ export const fetchPolarCustomerStateByCustomerId = async ({
   const json = await parsePolarJson<
     PolarCustomerStateResponse | PolarApiErrorResponse
   >(response)
+
+  return {
+    response,
+    json,
+  }
+}
+
+export const fetchPolarCustomerById = async ({
+  env,
+  customerId,
+}: {
+  env: PolarEnv
+  customerId: string
+}) => {
+  const response = await fetch(
+    `${getBaseApiUrl(env.POLAR_SERVER)}/v1/customers/${encodeURIComponent(customerId)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN ?? ''}`,
+      },
+    },
+  )
+
+  const json = await parsePolarJson<PolarCustomer | PolarApiErrorResponse>(response)
+
+  return {
+    response,
+    json,
+  }
+}
+
+export const fetchPolarCustomerByExternalId = async ({
+  env,
+  externalCustomerId,
+}: {
+  env: PolarEnv
+  externalCustomerId: string
+}) => {
+  const response = await fetch(
+    `${getBaseApiUrl(env.POLAR_SERVER)}/v1/customers/external/${encodeURIComponent(externalCustomerId)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN ?? ''}`,
+      },
+    },
+  )
+
+  const json = await parsePolarJson<PolarCustomer | PolarApiErrorResponse>(response)
 
   return {
     response,
@@ -277,6 +370,179 @@ const updatePolarCustomerExternalId = async ({
   )
 
   return response.ok
+}
+
+export const resolvePolarCustomerForIdentity = async ({
+  env,
+  externalCustomerId,
+  customerEmail,
+  customerId,
+}: {
+  env: PolarEnv
+  externalCustomerId?: string
+  customerEmail?: string
+  customerId?: string
+}) => {
+  if (externalCustomerId) {
+    const byExternalId = await fetchPolarCustomerByExternalId({
+      env,
+      externalCustomerId,
+    })
+
+    if (byExternalId.response.ok) {
+      return {
+        response: byExternalId.response,
+        json: byExternalId.json,
+        customer: byExternalId.json as PolarCustomer,
+      }
+    }
+
+    if (byExternalId.response.status !== 404) {
+      return {
+        response: byExternalId.response,
+        json: byExternalId.json,
+        customer: null,
+      }
+    }
+  }
+
+  if (customerId) {
+    const byCustomerId = await fetchPolarCustomerById({
+      env,
+      customerId,
+    })
+
+    if (byCustomerId.response.ok) {
+      return {
+        response: byCustomerId.response,
+        json: byCustomerId.json,
+        customer: byCustomerId.json as PolarCustomer,
+      }
+    }
+
+    if (byCustomerId.response.status !== 404) {
+      return {
+        response: byCustomerId.response,
+        json: byCustomerId.json,
+        customer: null,
+      }
+    }
+  }
+
+  const normalizedEmail = customerEmail?.trim().toLowerCase() ?? ''
+
+  if (!normalizedEmail) {
+    return {
+      response: new Response(null, { status: 404 }),
+      json: { error: { message: 'Customer could not be resolved.' } },
+      customer: null,
+    }
+  }
+
+  const customerList = await listPolarCustomersByEmail({
+    env,
+    email: normalizedEmail,
+  })
+
+  if (!customerList.response.ok) {
+    return {
+      response: customerList.response,
+      json: customerList.json,
+      customer: null,
+    }
+  }
+
+  const matchedCustomer = (
+    (customerList.json as PolarCustomerListResponse | null)?.items ?? []
+  ).find((candidate) => candidate.email?.trim().toLowerCase() === normalizedEmail)
+
+  if (!matchedCustomer?.id) {
+    return {
+      response: new Response(null, { status: 404 }),
+      json: { error: { message: 'Customer was not found for the supplied identity.' } },
+      customer: null,
+    }
+  }
+
+  if (externalCustomerId && matchedCustomer.external_id !== externalCustomerId) {
+    await updatePolarCustomerExternalId({
+      env,
+      customerId: matchedCustomer.id,
+      externalCustomerId,
+    }).catch(() => false)
+  }
+
+  return {
+    response: customerList.response,
+    json: matchedCustomer,
+    customer: {
+      ...matchedCustomer,
+      external_id: externalCustomerId || matchedCustomer.external_id || null,
+    },
+  }
+}
+
+type PolarCustomerSessionResponse = {
+  token?: string
+  customer_id?: string
+  customer_portal_url?: string
+  customer?: {
+    email?: string
+  }
+  error?: {
+    message?: string
+  } | string
+}
+
+export const createPolarCustomerSessionForIdentity = async ({
+  env,
+  externalCustomerId,
+  customerEmail,
+  customerId,
+  returnUrl,
+}: {
+  env: PolarEnv
+  externalCustomerId?: string
+  customerEmail?: string
+  customerId?: string
+  returnUrl?: string
+}) => {
+  const resolvedCustomer = await resolvePolarCustomerForIdentity({
+    env,
+    externalCustomerId,
+    customerEmail,
+    customerId,
+  })
+
+  if (!resolvedCustomer.customer?.id) {
+    return {
+      response: resolvedCustomer.response,
+      json: resolvedCustomer.json,
+      customer: null,
+    }
+  }
+
+  const response = await fetch(`${getBaseApiUrl(env.POLAR_SERVER)}/v1/customer-sessions/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN ?? ''}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      customer_id: resolvedCustomer.customer.id,
+      return_url: returnUrl || undefined,
+    }),
+  })
+
+  const json = await parsePolarJson<
+    PolarCustomerSessionResponse | PolarApiErrorResponse
+  >(response)
+
+  return {
+    response,
+    json,
+    customer: resolvedCustomer.customer,
+  }
 }
 
 export const fetchPolarCustomerStateForIdentity = async ({
