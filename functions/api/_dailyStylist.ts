@@ -86,6 +86,14 @@ type OpenMeteoForecastResponse = {
 
 type GeminiPart = {
   text?: string
+  inlineData?: {
+    data?: string
+    mimeType?: string
+  }
+  inline_data?: {
+    data?: string
+    mime_type?: string
+  }
 }
 
 type GeminiResponse = {
@@ -93,14 +101,24 @@ type GeminiResponse = {
     content?: {
       parts?: GeminiPart[]
     }
+    finishReason?: string
   }>
   error?: {
     message?: string
   }
 }
 
+type InlineImageAsset = {
+  imageBase64: string
+  mimeType: string
+}
+
 const DEFAULT_FROM_EMAIL = 'Personal AI Stylist <noreply@personalstylist.site>'
 const GEMINI_TEXT_MODEL = 'gemini-3-flash-preview'
+const GEMINI_IMAGE_MODELS = [
+  'gemini-2.5-flash-image',
+  'gemini-3.1-flash-image-preview',
+]
 const DELIVERY_HOUR = 6
 const DELIVERY_WINDOW_MINUTES = 15
 
@@ -268,7 +286,7 @@ const getLocalizedStrings = (preferredLocale?: string) =>
         heading: '오늘 아침 스타일 브리프가 도착했습니다',
         intro: '저장된 체형 정보, 기준 사진, 오늘 날씨를 바탕으로 아침 스타일 추천을 정리했습니다.',
         weatherHeading: '오늘 날씨 요약',
-        photoHeading: '오늘 브리프에 사용한 기준 사진',
+        photoHeading: '오늘 추천 룩 미리보기',
         briefHeading: '오늘의 스타일 추천',
         footer: '이 메일은 활성화된 무료 체험 또는 구독 계정에만 발송됩니다.',
       }
@@ -277,7 +295,7 @@ const getLocalizedStrings = (preferredLocale?: string) =>
         heading: 'Your morning style brief is ready',
         intro: 'This recommendation was prepared from your saved body details, reference photo, and today\'s weather.',
         weatherHeading: 'Today\'s weather',
-        photoHeading: 'Reference photo used for today\'s brief',
+        photoHeading: 'Today\'s generated look preview',
         briefHeading: 'Today\'s styling recommendation',
         footer: 'This email is only delivered to accounts with an active trial or subscription.',
       }
@@ -287,13 +305,13 @@ const buildDailyEmailHtml = ({
   locationName,
   weatherSummary,
   brief,
-  referencePhotoCid,
+  styledLookCid,
 }: {
   preferredLocale?: string
   locationName: string
   weatherSummary: string
   brief: string
-  referencePhotoCid?: string
+  styledLookCid?: string
 }) => {
   const strings = getLocalizedStrings(preferredLocale)
 
@@ -306,10 +324,10 @@ const buildDailyEmailHtml = ({
     '<h2 style="margin:0 0 12px;font-size:17px;color:#201720">' + escapeHtml(strings.weatherHeading) + '</h2>' +
     '<p style="margin:0;color:#4a3d4a;line-height:1.7"><strong>' + escapeHtml(locationName) + '</strong><br />' + escapeHtml(weatherSummary) + '</p>' +
     '</div>' +
-    (referencePhotoCid
+    (styledLookCid
       ? '<div style="border-radius:18px;background:#fff;border:1px solid #ead9d5;padding:18px;margin-bottom:16px">' +
         '<h2 style="margin:0 0 12px;font-size:17px;color:#201720">' + escapeHtml(strings.photoHeading) + '</h2>' +
-        '<img src="cid:' + escapeHtml(referencePhotoCid) + '" alt="" style="display:block;width:100%;border-radius:18px;border:1px solid #ead9d5;max-height:420px;object-fit:cover" />' +
+        '<img src="cid:' + escapeHtml(styledLookCid) + '" alt="" style="display:block;width:100%;border-radius:18px;border:1px solid #ead9d5;max-height:420px;object-fit:cover" />' +
         '</div>'
       : '') +
     '<div style="border-radius:18px;background:#fff;border:1px solid #ead9d5;padding:18px;margin-bottom:16px">' +
@@ -577,6 +595,31 @@ const buildDailyBriefPrompt = ({
   'Weather code meaning: ' + weatherCodeDescription(weather.weatherCode, profile.preferred_locale),
 ].join('\n');
 
+const buildDailyLookPrompt = ({
+  profile,
+  weather,
+  brief,
+}: {
+  profile: DailyStyleProfileRecord
+  weather: DailyWeatherSnapshot
+  brief: string
+}) => [
+  'You are Personal AI Stylist, creating a single photorealistic daily outfit visualization.',
+  'Use the attached reference photo of the same person.',
+  'Keep the exact same face, identity, skin tone, body proportions, and overall facial features.',
+  'Do not change the person. Restyle only the outfit, accessories, styling details, and the pose if needed.',
+  'Generate one polished editorial-quality image that matches today\'s weather and the styling brief below.',
+  'Favor a flattering full-body or 3/4 portrait with realistic fabric detail, wearable layering, and coherent accessories.',
+  'The result must feel like the same person actually wearing the recommended outfit today.',
+  'Avoid collage layouts, text overlays, split screens, or before/after compositions.',
+  'Preferred locale: ' + profile.preferred_locale,
+  'Saved location: ' + profile.location_name,
+  'Body reference: ' + profile.height_cm + ' cm, ' + profile.weight_kg + ' kg.',
+  'Today\'s weather: ' + weather.summary,
+  'Follow this daily styling brief closely:',
+  brief,
+].join('\n\n')
+
 const isRecoverableGeminiBriefError = (message?: string) => {
   const value = message?.toLowerCase() ?? ''
 
@@ -664,6 +707,72 @@ const buildFallbackDailyBrief = ({
   ].join('\n')
 };
 
+const extractText = (parts: GeminiPart[] = []) =>
+  parts
+    .map((part) => part.text?.trim() ?? '')
+    .filter(Boolean)
+    .join('\n\n')
+
+const extractImage = (parts: GeminiPart[] = []) => {
+  const imagePart = parts.find((part) => {
+    const inlineData = part.inlineData ?? part.inline_data
+    return Boolean(inlineData?.data)
+  })
+
+  const inlineData = imagePart?.inlineData ?? imagePart?.inline_data
+
+  if (!inlineData?.data || !(inlineData?.mimeType ?? inlineData?.mime_type)) {
+    return null
+  }
+
+  return {
+    imageBase64: inlineData.data,
+    mimeType: inlineData.mimeType ?? inlineData.mime_type ?? 'image/png',
+  }
+}
+
+const callGemini = async ({
+  env,
+  model,
+  parts,
+  maxOutputTokens,
+  temperature,
+}: {
+  env: DailyStylistEnv
+  model: string
+  parts: Array<Record<string, unknown>>
+  maxOutputTokens: number
+  temperature: number
+}) => {
+  const response = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': env.GEMINI_API_KEY ?? '',
+      },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          temperature,
+          topK: 32,
+          topP: 0.95,
+          maxOutputTokens,
+        },
+      }),
+    },
+  )
+
+  const rawText = await response.text()
+  const json = rawText.trim() ? (JSON.parse(rawText) as GeminiResponse) : null
+
+  return {
+    response,
+    json,
+  }
+}
+
 const callGeminiText = async ({
   env,
   prompt,
@@ -677,35 +786,18 @@ const callGeminiText = async ({
   mimeType?: string
   preferredLocale?: string
 }) => {
-  const response = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_TEXT_MODEL + ':generateContent',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': env.GEMINI_API_KEY ?? '',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            ...(imageBase64 && mimeType
-              ? [{ inline_data: { mime_type: mimeType, data: imageBase64 } }]
-              : []),
-          ],
-        }],
-        generationConfig: {
-          temperature: 0.72,
-          topK: 32,
-          topP: 0.95,
-          maxOutputTokens: 1400,
-        },
-      }),
-    },
-  )
-
-  const rawText = await response.text()
-  const json = rawText.trim() ? (JSON.parse(rawText) as GeminiResponse) : null
+  const { response, json } = await callGemini({
+    env,
+    model: GEMINI_TEXT_MODEL,
+    parts: [
+      { text: prompt },
+      ...(imageBase64 && mimeType
+        ? [{ inline_data: { mime_type: mimeType, data: imageBase64 } }]
+        : []),
+    ],
+    maxOutputTokens: 1400,
+    temperature: 0.72,
+  })
 
   if (!response.ok) {
     throw new Error(
@@ -716,10 +808,7 @@ const callGeminiText = async ({
     )
   }
 
-  const text = (json?.candidates?.[0]?.content?.parts ?? [])
-    .map((part) => part.text?.trim() ?? '')
-    .filter(Boolean)
-    .join('\n\n')
+  const text = extractText(json?.candidates?.[0]?.content?.parts ?? [])
 
   if (!text) {
     throw new Error(
@@ -730,6 +819,56 @@ const callGeminiText = async ({
   }
 
   return text
+}
+
+const generateDailyStyledImage = async ({
+  env,
+  profile,
+  weather,
+  brief,
+  referencePhoto,
+}: {
+  env: DailyStylistEnv
+  profile: DailyStyleProfileRecord
+  weather: DailyWeatherSnapshot
+  brief: string
+  referencePhoto: InlineImageAsset
+}) => {
+  const prompt = buildDailyLookPrompt({
+    profile,
+    weather,
+    brief,
+  })
+
+  for (const model of GEMINI_IMAGE_MODELS) {
+    const { response, json } = await callGemini({
+      env,
+      model,
+      parts: [
+        { text: prompt },
+        {
+          inline_data: {
+            mime_type: referencePhoto.mimeType,
+            data: referencePhoto.imageBase64,
+          },
+        },
+      ],
+      maxOutputTokens: 1536,
+      temperature: 0.9,
+    })
+
+    if (!response.ok) {
+      continue
+    }
+
+    const generatedImage = extractImage(json?.candidates?.[0]?.content?.parts ?? [])
+
+    if (generatedImage?.imageBase64 && generatedImage.mimeType) {
+      return generatedImage
+    }
+  }
+
+  return null
 }
 
 export const resolveLocationQuery = async ({
@@ -960,6 +1099,29 @@ const readProfilePhotoInlineData = async ({
     imageBase64: toBase64(buffer),
     mimeType: object.httpMetadata?.contentType || 'image/jpeg',
   }
+}
+
+const loadStoredProfilePhoto = async ({
+  env,
+  profile,
+}: {
+  env: DailyStylistEnv
+  profile: DailyStyleProfileRecord
+}) => {
+  if (!profile.photo_object_key) {
+    throw new Error('A stored profile photo is required to generate the daily brief.')
+  }
+
+  const photo = await readProfilePhotoInlineData({
+    env,
+    objectKey: profile.photo_object_key,
+  })
+
+  if (!photo?.imageBase64 || !photo.mimeType) {
+    throw new Error('The stored profile photo could not be loaded from R2.')
+  }
+
+  return photo
 }
 
 export const saveCustomerStyleProfile = async ({
@@ -1287,30 +1449,18 @@ const generateDailyBrief = async (
   profile: DailyStyleProfileRecord,
   weather: DailyWeatherSnapshot,
   localDate: string,
+  referencePhoto: InlineImageAsset,
 ) => {
   if (!env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not configured on the server.')
-  }
-
-  if (!profile.photo_object_key) {
-    throw new Error('A stored profile photo is required to generate the daily brief.')
-  }
-
-  const photo = await readProfilePhotoInlineData({
-    env,
-    objectKey: profile.photo_object_key,
-  })
-
-  if (!photo?.imageBase64 || !photo.mimeType) {
-    throw new Error('The stored profile photo could not be loaded from R2.')
   }
 
   try {
     return await callGeminiText({
       env,
       prompt: buildDailyBriefPrompt({ profile, weather, localDate }),
-      imageBase64: photo.imageBase64,
-      mimeType: photo.mimeType,
+      imageBase64: referencePhoto.imageBase64,
+      mimeType: referencePhoto.mimeType,
       preferredLocale: profile.preferred_locale,
     })
   } catch (error) {
@@ -1328,9 +1478,14 @@ const sendDailyStyleEmail = async (
   weather: DailyWeatherSnapshot,
   brief: string,
   localDate: string,
+  styledLook?: InlineImageAsset | null,
 ) => {
   if (!env.RESEND_API_KEY) {
     throw new Error('RESEND_API_KEY is not configured on the server.')
+  }
+
+  if (!styledLook?.imageBase64 || !styledLook.mimeType) {
+    throw new Error('The daily styled look could not be generated.')
   }
 
   const strings = getLocalizedStrings(profile.preferred_locale)
@@ -1342,16 +1497,9 @@ const sendDailyStyleEmail = async (
     weather.summary,
     brief,
   ].join('|'))
-
-  const referencePhoto = profile.photo_object_key
-    ? await readProfilePhotoInlineData({
-        env,
-        objectKey: profile.photo_object_key,
-      }).catch(() => null)
-    : null
-  const referencePhotoCid = referencePhoto ? 'daily-brief-reference-photo' : undefined
-  const referencePhotoExtension = referencePhoto
-    ? getFileExtension(referencePhoto.mimeType)
+  const styledLookCid = styledLook ? 'daily-brief-styled-look' : undefined
+  const styledLookExtension = styledLook
+    ? getFileExtension(styledLook.mimeType)
     : 'jpg'
 
   const response = await fetch('https://api.resend.com/emails', {
@@ -1370,7 +1518,7 @@ const sendDailyStyleEmail = async (
         locationName: profile.location_name,
         weatherSummary: weather.summary,
         brief,
-        referencePhotoCid,
+        styledLookCid,
       }),
       text: buildDailyEmailText({
         preferredLocale: profile.preferred_locale,
@@ -1379,12 +1527,12 @@ const sendDailyStyleEmail = async (
         brief,
       }),
       reply_to: env.RESEND_REPLY_TO ? [env.RESEND_REPLY_TO] : undefined,
-      attachments: referencePhoto
+      attachments: styledLook
         ? [
             {
-              content: referencePhoto.imageBase64,
-              filename: 'daily-brief-reference-' + localDate + '.' + referencePhotoExtension,
-              contentId: referencePhotoCid,
+              content: styledLook.imageBase64,
+              filename: 'daily-brief-look-' + localDate + '.' + styledLookExtension,
+              contentId: styledLookCid,
             },
           ]
         : undefined,
@@ -1447,8 +1595,29 @@ const deliverProfile = async (
       locationName: profile.location_name,
       preferredLocale: profile.preferred_locale,
     })
-    const brief = await generateDailyBrief(env, profile, weather, due.localDate)
-    const emailId = await sendDailyStyleEmail(env, profile, weather, brief, due.localDate)
+    const referencePhoto = await loadStoredProfilePhoto({ env, profile })
+    const brief = await generateDailyBrief(
+      env,
+      profile,
+      weather,
+      due.localDate,
+      referencePhoto,
+    )
+    const styledLook = await generateDailyStyledImage({
+      env,
+      profile,
+      weather,
+      brief,
+      referencePhoto,
+    }).catch(() => null)
+    const emailId = await sendDailyStyleEmail(
+      env,
+      profile,
+      weather,
+      brief,
+      due.localDate,
+      styledLook,
+    )
     const nowIso = now.toISOString()
 
     await updateDeliveryLog(env, profile, due.localDate, {
