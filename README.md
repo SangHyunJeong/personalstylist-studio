@@ -72,6 +72,8 @@ Frontend only:
 npm run dev
 ```
 
+The Vite dev server is pinned to `http://localhost:5173` so Supabase email redirects do not drift to a fallback port.
+
 Cloudflare Pages + Functions locally:
 
 ```bash
@@ -82,9 +84,11 @@ npm run cf:dev
 
 - The browser uses `@supabase/supabase-js` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` by default, with `VITE_SUPABASE_ANON_KEY` as a local fallback.
 - The UI now shows a sign-up/sign-in card before users can enter protected flows.
+- Email/password sign-up explicitly sets `emailRedirectTo` to the current app origin and pathname, so confirmation emails return to the running frontend instead of relying only on the Supabase project `site_url`.
 - Cloudflare Functions verify the Supabase bearer token through `SUPABASE_URL/auth/v1/user`, using `SUPABASE_PUBLISHABLE_KEY` by default and `SUPABASE_ANON_KEY` as a fallback.
 - Checkout creation is tied to the signed-in user email.
 - Report email delivery is restricted to the signed-in account email.
+- Hosted Supabase projects still need `http://localhost:5173` and/or `http://127.0.0.1:5173` added under Authentication > URL Configuration.
 
 ## Supabase Files
 

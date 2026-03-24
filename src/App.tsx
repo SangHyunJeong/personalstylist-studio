@@ -174,6 +174,14 @@ const getInitialPurchaseEmail = (): string => {
   return window.localStorage.getItem(PURCHASE_EMAIL_KEY) ?? ''
 }
 
+const getAuthRedirectUrl = (): string | undefined => {
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+
+  return `${window.location.origin}${window.location.pathname}`
+}
+
 const localeCopy = {
   ko: {
     languageLabel: 'Language',
@@ -1141,6 +1149,9 @@ function App() {
         const { error } = await supabaseClient.auth.signUp({
           email: trimmedEmail,
           password: authPassword,
+          options: {
+            emailRedirectTo: getAuthRedirectUrl(),
+          },
         })
 
         if (error) {
