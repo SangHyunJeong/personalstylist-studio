@@ -433,7 +433,7 @@ const localeCopy = {
     hairEmpty:
       '사진을 업로드하면 3x3 헤어스타일 추천 이미지와 설명이 여기에 표시됩니다.',
     checkoutFlowHint:
-      '지금 버튼을 누르면 단건 Polar 체크아웃으로 이동합니다. 결제가 완료되면 같은 입력값으로 생성이 자동 이어집니다.',
+      '활성 구독이 있으면 바로 생성되고, 없으면 단건 Polar 체크아웃으로 이동합니다. 결제가 완료되면 같은 입력값으로 생성이 자동 이어집니다.',
     hairPromptTitle: '생성형 AI 프롬프트',
     hairPromptDescription:
       'ChatGPT, Gemini 또는 다른 이미지 생성 도구에서 다시 시도할 수 있도록 프롬프트를 복사합니다.',
@@ -675,7 +675,7 @@ const localeCopy = {
     hairEmpty:
       'Upload your photo to see the 3x3 hairstyle grid and recommendation details here.',
     checkoutFlowHint:
-      'When you submit, a one-time Polar checkout opens first. As soon as the payment completes, generation resumes automatically with the same inputs.',
+      'If an active subscription exists, generation starts immediately. Otherwise a one-time Polar checkout opens and generation resumes automatically after payment.',
     hairPromptTitle: 'Generative Prompt',
     hairPromptDescription:
       'Copy an optimized prompt to try the hairstyle generation again in ChatGPT, Gemini, or another image tool.',
@@ -1208,6 +1208,10 @@ function App() {
     billingAccessPhase === 'trialing'
       ? copy.checkoutTrialBody
       : copy.checkoutVerifiedBody
+  const hasGenerationAccess =
+    isPurchaseVerified ||
+    billingAccessPhase === 'trialing' ||
+    billingAccessPhase === 'active'
 
   const setAuthFeedback = (tone: StatusTone, message: string) => {
     setAuthMessageTone(tone)
@@ -2319,7 +2323,7 @@ function App() {
 
   const runStyleGeneration = async (
     payload: StyleGenerationPayload,
-    deliveryEmail = purchaseEmail,
+    deliveryEmail = purchaseEmail || authenticatedEmail,
   ) => {
     try {
       setIsStyleLoading(true)
@@ -2396,7 +2400,7 @@ function App() {
 
   const runHairGeneration = async (
     payload: HairGenerationPayload,
-    deliveryEmail = purchaseEmail,
+    deliveryEmail = purchaseEmail || authenticatedEmail,
   ) => {
     try {
       setIsHairLoading(true)
@@ -2535,7 +2539,20 @@ function App() {
         photoName: stylePhotoFile.name,
       }
 
-      if (!isPurchaseVerified) {
+      let deliveryEmail = purchaseEmail || authenticatedEmail
+      let hasAccess = hasGenerationAccess
+
+      if (!hasAccess) {
+        const accessSnapshot = await syncBillingAccess({
+          suppressErrors: true,
+          preservePendingState: true,
+        })
+
+        hasAccess = Boolean(accessSnapshot?.hasAccess)
+        deliveryEmail = accessSnapshot?.customerEmail || deliveryEmail
+      }
+
+      if (!hasAccess) {
         persistPendingCheckout(payload)
         await startCheckout('one_time', {
           onError: (message) => setStyleErrorMessage(message),
@@ -2543,7 +2560,7 @@ function App() {
         return
       }
 
-      await runStyleGeneration(payload)
+      await runStyleGeneration(payload, deliveryEmail)
     } catch (error) {
       const fallback = copy.styleFetchError
       setStyleErrorMessage(error instanceof Error ? error.message : fallback)
@@ -2575,7 +2592,20 @@ function App() {
         photoName: hairPhotoFile.name,
       }
 
-      if (!isPurchaseVerified) {
+      let deliveryEmail = purchaseEmail || authenticatedEmail
+      let hasAccess = hasGenerationAccess
+
+      if (!hasAccess) {
+        const accessSnapshot = await syncBillingAccess({
+          suppressErrors: true,
+          preservePendingState: true,
+        })
+
+        hasAccess = Boolean(accessSnapshot?.hasAccess)
+        deliveryEmail = accessSnapshot?.customerEmail || deliveryEmail
+      }
+
+      if (!hasAccess) {
         persistPendingCheckout(payload)
         await startCheckout('one_time', {
           onError: (message) => setHairErrorMessage(message),
@@ -2583,7 +2613,7 @@ function App() {
         return
       }
 
-      await runHairGeneration(payload)
+      await runHairGeneration(payload, deliveryEmail)
     } catch (error) {
       const fallback = copy.hairFetchError
       setHairErrorMessage(error instanceof Error ? error.message : fallback)
@@ -2902,7 +2932,17 @@ function App() {
       return
     }
 
-    if (isPurchaseVerified) {
+    if (hasGenerationAccess) {
+      setView(targetView)
+      return
+    }
+
+    const accessSnapshot = await syncBillingAccess({
+      suppressErrors: true,
+      preservePendingState: true,
+    })
+
+    if (accessSnapshot?.hasAccess) {
       setView(targetView)
       return
     }
@@ -3250,7 +3290,7 @@ function App() {
         </div>
         <p className="delivery-target">
           <strong>{copy.emailSendTarget}</strong>
-          <span>{purchaseEmail || copy.emailSendUnavailable}</span>
+          <span>{purchaseEmail || authenticatedEmail || copy.emailSendUnavailable}</span>
         </p>
         {isSending ? (
           <p className="status-message fallback">{copy.emailSendLoading}</p>
@@ -4219,7 +4259,7 @@ function App() {
                     <p className="status-message error">{styleErrorMessage}</p>
                   ) : null}
 
-                  {!isPurchaseVerified ? (
+                  {!hasGenerationAccess ? (
                     <p className="status-message fallback">{copy.checkoutFlowHint}</p>
                   ) : null}
 
@@ -4230,9 +4270,9 @@ function App() {
                   >
                     {isStyleLoading
                       ? copy.styleActionLoading
-                      : isCheckoutLoading && activeCheckoutKind === 'one_time' && !isPurchaseVerified
+                      : isCheckoutLoading && activeCheckoutKind === 'one_time' && !hasGenerationAccess
                         ? copy.stylePayActionLoading
-                        : isPurchaseVerified
+                        : hasGenerationAccess
                           ? copy.styleAction
                           : copy.stylePayAction}
                   </button>
@@ -4333,7 +4373,7 @@ function App() {
                   <p className="status-message error">{hairErrorMessage}</p>
                 ) : null}
 
-                {!isPurchaseVerified ? (
+                {!hasGenerationAccess ? (
                   <p className="status-message fallback">{copy.checkoutFlowHint}</p>
                 ) : null}
 
@@ -4345,9 +4385,9 @@ function App() {
                 >
                   {isHairLoading
                     ? copy.hairActionLoading
-                    : isCheckoutLoading && activeCheckoutKind === 'one_time' && !isPurchaseVerified
+                    : isCheckoutLoading && activeCheckoutKind === 'one_time' && !hasGenerationAccess
                       ? copy.hairPayActionLoading
-                      : isPurchaseVerified
+                      : hasGenerationAccess
                         ? copy.hairAction
                         : copy.hairPayAction}
                 </button>

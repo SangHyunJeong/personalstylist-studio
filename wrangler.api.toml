@@ -2,12 +2,6 @@ name = "personalstylist-api"
 main = "api-worker.ts"
 compatibility_date = "2026-03-09"
 
-routes = [
-  { pattern = "personalstylist.site/api/style-report*", zone_name = "personalstylist.site" },
-  { pattern = "personalstylist.site/api/hairstyle-grid*", zone_name = "personalstylist.site" },
-  { pattern = "www.personalstylist.site/api/style-report*", zone_name = "personalstylist.site" },
-  { pattern = "www.personalstylist.site/api/hairstyle-grid*", zone_name = "personalstylist.site" },
-]
 
 [triggers]
 crons = ["0 * * * *"]
