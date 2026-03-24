@@ -202,6 +202,9 @@ const localeCopy = {
     authSignUpTab: '회원가입',
     authSignInAction: '이메일로 로그인',
     authSignUpAction: '이메일로 회원가입',
+    authGoogleAction: 'Google로 계속하기',
+    authGoogleRedirecting: 'Google 로그인으로 이동 중...',
+    authDivider: '또는',
     authSubmitting: '처리 중...',
     authSignedInTitle: '로그인 완료',
     authSignedInBody:
@@ -358,6 +361,9 @@ const localeCopy = {
     authSignUpTab: 'Sign Up',
     authSignInAction: 'Sign in with email',
     authSignUpAction: 'Create account with email',
+    authGoogleAction: 'Continue with Google',
+    authGoogleRedirecting: 'Redirecting to Google...',
+    authDivider: 'or',
     authSubmitting: 'Working...',
     authSignedInTitle: 'Signed in',
     authSignedInBody:
@@ -696,6 +702,27 @@ const PersonIcon = ({ className = '' }: { className?: string }) => (
       strokeWidth="1.8"
     />
   </Icon>
+)
+
+const GoogleIcon = ({ className = '' }: { className?: string }) => (
+  <svg aria-hidden="true" className={className} viewBox="0 0 24 24">
+    <path
+      d="M21.8 12.23c0-.68-.06-1.33-.17-1.95H12v3.69h5.5a4.7 4.7 0 0 1-2.04 3.08v2.56h3.3c1.93-1.78 3.04-4.39 3.04-7.38Z"
+      fill="#4285F4"
+    />
+    <path
+      d="M12 22c2.75 0 5.06-.91 6.76-2.47l-3.3-2.56c-.91.61-2.08.97-3.46.97-2.65 0-4.9-1.79-5.71-4.19H2.89v2.64A10 10 0 0 0 12 22Z"
+      fill="#34A853"
+    />
+    <path
+      d="M6.29 13.75A6 6 0 0 1 5.97 12c0-.61.11-1.2.32-1.75V7.61H2.89A10 10 0 0 0 2 12c0 1.61.38 3.14.89 4.39l3.4-2.64Z"
+      fill="#FBBC05"
+    />
+    <path
+      d="M12 6.06c1.5 0 2.85.51 3.91 1.51l2.93-2.93C17.06 3 14.75 2 12 2A10 10 0 0 0 2.89 7.61l3.4 2.64c.81-2.4 3.06-4.19 5.71-4.19Z"
+      fill="#EA4335"
+    />
+  </svg>
 )
 
 const navItems = [
@@ -1109,6 +1136,40 @@ function App() {
 
   const clearPendingEntryView = () => {
     window.localStorage.removeItem(PENDING_ENTRY_VIEW_KEY)
+  }
+
+  const handleGoogleSignIn = async () => {
+    if (!hasAuthConfig) {
+      setAuthFeedback('error', copy.authConfigMissing)
+      return
+    }
+
+    if (!supabaseClient) {
+      setAuthFeedback('error', copy.authConfigMissing)
+      return
+    }
+
+    try {
+      setIsAuthSubmitting(true)
+      setAuthFeedback('fallback', copy.authGoogleRedirecting)
+
+      const { error } = await supabaseClient.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: getAuthRedirectUrl(),
+        },
+      })
+
+      if (error) {
+        throw error
+      }
+    } catch (error) {
+      setAuthFeedback(
+        'error',
+        error instanceof Error ? error.message : copy.authSessionRequired,
+      )
+      setIsAuthSubmitting(false)
+    }
   }
 
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -2244,6 +2305,22 @@ function App() {
           <h3>{copy.authPanelTitle}</h3>
         </div>
         <p className="rich-paragraph">{copy.authPanelBody}</p>
+        <div className="oauth-actions">
+          <button
+            className="utility-button oauth-button"
+            disabled={isAuthSubmitting}
+            onClick={() => {
+              void handleGoogleSignIn()
+            }}
+            type="button"
+          >
+            <GoogleIcon className="oauth-provider-icon" />
+            {copy.authGoogleAction}
+          </button>
+        </div>
+        <div className="auth-divider">
+          <span>{copy.authDivider}</span>
+        </div>
         <div className="auth-mode-switch">
           <button
             className={`auth-mode-button ${authMode === 'sign-in' ? 'is-active' : ''}`}

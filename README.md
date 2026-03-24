@@ -6,6 +6,7 @@ This project now includes Supabase email/password authentication for:
 
 - 회원가입
 - 로그인
+- Google OAuth 로그인
 - 로그아웃
 - authenticated API access for checkout, generation, and email delivery
 
@@ -85,13 +86,19 @@ npm run cf:dev
 - The browser uses `@supabase/supabase-js` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` by default, with `VITE_SUPABASE_ANON_KEY` as a local fallback.
 - The UI now shows a sign-up/sign-in card before users can enter protected flows.
 - Email/password sign-up explicitly sets `emailRedirectTo` to the current app origin and pathname, so confirmation emails return to the running frontend instead of relying only on the Supabase project `site_url`.
+- Google OAuth uses `supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin + window.location.pathname } })`, which fits Supabase's browser-side implicit flow guidance for social login.
 - Cloudflare Functions verify the Supabase bearer token through `SUPABASE_URL/auth/v1/user`, using `SUPABASE_PUBLISHABLE_KEY` by default and `SUPABASE_ANON_KEY` as a fallback.
 - Checkout creation is tied to the signed-in user email.
 - Report email delivery is restricted to the signed-in account email.
 - Hosted Supabase projects still need `http://localhost:5173` and/or `http://127.0.0.1:5173` added under Authentication > URL Configuration.
 
-## Supabase Files
+## Google OAuth
 
+- Hosted Supabase projects: enable Google under Authentication > Providers, then add your app origins (for example `http://localhost:5173`) in Google Cloud and keep the same origins in Supabase redirect settings.
+- Local Supabase CLI: add `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET` to `.env`, then uncomment the Google template in `supabase/config.toml` and replace `client_id` with your Google OAuth client ID.
+- Per the Supabase Google auth guide, Google Cloud local development should use `http://127.0.0.1:54321/auth/v1/callback` as the authorized redirect URI. See https://supabase.com/docs/guides/auth/social-login/auth-google
+
+## Supabase Files
 - `supabase/config.toml` was created with `supabase init`
 - `supabase/seed.sql` is present so the local CLI project is ready for `supabase start`
 
