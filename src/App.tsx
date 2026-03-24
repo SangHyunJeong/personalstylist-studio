@@ -132,6 +132,10 @@ const getInitialView = (): View => {
 
   const hash = window.location.hash.replace('#', '')
 
+  if (isSupabaseAuthHash(hash)) {
+    return 'home'
+  }
+
   if (
     hash === 'style' ||
     hash === 'hair' ||
@@ -181,6 +185,15 @@ const getAuthRedirectUrl = (): string | undefined => {
 
   return `${window.location.origin}${window.location.pathname}`
 }
+
+
+const isSupabaseAuthHash = (hash: string) =>
+  hash.includes('access_token=') ||
+  hash.includes('refresh_token=') ||
+  hash.includes('error_description=') ||
+  hash.includes('error_code=') ||
+  hash.includes('token_type=') ||
+  hash.includes('expires_in=')
 
 const localeCopy = {
   ko: {
@@ -917,6 +930,12 @@ function App() {
 
   useEffect(() => {
     const handleHashChange = () => {
+      const rawHash = window.location.hash.replace('#', '')
+
+      if (isSupabaseAuthHash(rawHash)) {
+        return
+      }
+
       setView(getInitialView())
     }
 
@@ -928,6 +947,12 @@ function App() {
   }, [])
 
   useEffect(() => {
+    const rawHash = window.location.hash.replace('#', '')
+
+    if (isSupabaseAuthHash(rawHash)) {
+      return
+    }
+
     const hash = view === 'home' ? '' : `#${view}`
     const url = `${window.location.pathname}${window.location.search}${hash}`
     window.history.replaceState(null, '', url)
