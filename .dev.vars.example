@@ -1,5 +1,6 @@
 SUPABASE_URL=http://127.0.0.1:54321
 SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 # Local Supabase CLI/self-hosted fallback:
 # SUPABASE_ANON_KEY=your-local-anon-key
 GEMINI_API_KEY=

@@ -52,6 +52,11 @@ type SendReportEmailResponse = {
   error?: string
 }
 
+type DeleteAccountResponse = {
+  message?: string
+  error?: string
+}
+
 type StyleGenerationPayload = {
   kind: 'style'
   imageBase64: string
@@ -194,6 +199,42 @@ const isSupabaseAuthHash = (hash: string) =>
   hash.includes('error_code=') ||
   hash.includes('token_type=') ||
   hash.includes('expires_in=')
+
+const formatAccountTimestamp = (value: string | undefined, locale: string) => {
+  if (!value) {
+    return ''
+  }
+
+  const timestamp = Date.parse(value)
+
+  if (Number.isNaN(timestamp)) {
+    return ''
+  }
+
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(timestamp)
+}
+
+const formatAuthProvider = (value?: string) => {
+  if (!value) {
+    return ''
+  }
+
+  switch (value) {
+    case 'google':
+      return 'Google'
+    case 'email':
+      return 'Email'
+    default:
+      return value
+        .split('_')
+        .filter(Boolean)
+        .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
+        .join(' ')
+  }
+}
 
 const localeCopy = {
   ko: {
@@ -340,6 +381,41 @@ const localeCopy = {
     accountPageTitle: '계정과 디지털 액세스를 관리하세요',
     accountPageBody:
       '여기에서 회원가입 또는 로그인을 하고, 같은 계정으로 Polar 결제를 완료한 뒤 스타일 생성과 결과 이메일 전송을 이어서 사용할 수 있습니다.',
+    accountProfileTitle: '내 정보',
+    accountProfileBody:
+      '현재 로그인된 계정과 인증 정보를 확인합니다.',
+    accountEmailLabel: '이메일',
+    accountProviderLabel: '로그인 방식',
+    accountUserIdLabel: '사용자 ID',
+    accountCreatedAtLabel: '가입일',
+    accountUnavailable: '확인할 수 없음',
+    accountPasswordTitle: '비밀번호 재설정',
+    accountPasswordBody:
+      '로그인된 상태에서 새 비밀번호를 설정합니다. 보안 설정에 따라 이메일 인증 코드가 필요할 수 있습니다.',
+    accountPasswordLabel: '새 비밀번호',
+    accountPasswordPlaceholder: '새 비밀번호를 입력',
+    accountPasswordConfirmLabel: '새 비밀번호 확인',
+    accountPasswordConfirmPlaceholder: '새 비밀번호를 다시 입력',
+    accountPasswordNonceLabel: '이메일 인증 코드',
+    accountPasswordNoncePlaceholder: '필요한 경우 이메일로 받은 코드를 입력',
+    accountPasswordNonceAction: '인증 코드 보내기',
+    accountPasswordAction: '비밀번호 변경',
+    accountPasswordMinLength: '비밀번호는 6자 이상이어야 합니다.',
+    accountPasswordNonceSent:
+      '이메일 인증 코드를 전송했습니다. 코드가 도착하면 입력 후 비밀번호를 변경하세요.',
+    accountPasswordUpdated: '비밀번호를 변경했습니다.',
+    accountDeleteTitle: '계정 탈퇴',
+    accountDeleteBody:
+      '계정을 탈퇴하면 현재 로그인과 결제 연동을 더 이상 사용할 수 없습니다. 계속하려면 현재 이메일을 다시 입력하세요.',
+    accountDeleteConfirmLabel: '현재 이메일로 탈퇴 확인',
+    accountDeleteConfirmPlaceholder: '현재 로그인 이메일을 입력',
+    accountDeleteMismatch: '입력한 이메일이 현재 계정과 일치하지 않습니다.',
+    accountDeleteAction: '계정 탈퇴',
+    accountDeletePrompt:
+      '정말로 계정을 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+    accountDeleteSuccess:
+      '계정을 탈퇴했고 이 기기에서 로그아웃했습니다.',
+    accountDeleteError: '계정을 탈퇴하지 못했습니다.',
     checkoutError: '결제 페이지를 시작하지 못했습니다.',
     checkoutVerifiedTitle: '결제 확인 완료',
     checkoutVerifiedBody:
@@ -500,6 +576,41 @@ const localeCopy = {
     accountPageTitle: 'Manage your account and digital access',
     accountPageBody:
       'Sign up or sign in here, then use the same account for Polar checkout, generation, and result delivery.',
+    accountProfileTitle: 'My details',
+    accountProfileBody:
+      'Review the account that is currently signed in on this device.',
+    accountEmailLabel: 'Email',
+    accountProviderLabel: 'Sign-in method',
+    accountUserIdLabel: 'User ID',
+    accountCreatedAtLabel: 'Created',
+    accountUnavailable: 'Unavailable',
+    accountPasswordTitle: 'Reset password',
+    accountPasswordBody:
+      'Set a new password while signed in. Depending on your Supabase security settings, an email verification code may be required.',
+    accountPasswordLabel: 'New password',
+    accountPasswordPlaceholder: 'Enter a new password',
+    accountPasswordConfirmLabel: 'Confirm new password',
+    accountPasswordConfirmPlaceholder: 'Re-enter the new password',
+    accountPasswordNonceLabel: 'Email verification code',
+    accountPasswordNoncePlaceholder: 'Enter the code from email if Supabase requests it',
+    accountPasswordNonceAction: 'Send verification code',
+    accountPasswordAction: 'Update password',
+    accountPasswordMinLength: 'Your password must be at least 6 characters long.',
+    accountPasswordNonceSent:
+      'A verification code was sent by email. Enter it below if Supabase asks for reauthentication.',
+    accountPasswordUpdated: 'Your password has been updated.',
+    accountDeleteTitle: 'Delete account',
+    accountDeleteBody:
+      'Deleting your account removes future access to this sign-in and its linked checkout flow. Enter your current email to confirm.',
+    accountDeleteConfirmLabel: 'Confirm with your current email',
+    accountDeleteConfirmPlaceholder: 'Enter your signed-in email',
+    accountDeleteMismatch: 'The confirmation email does not match the signed-in account.',
+    accountDeleteAction: 'Delete my account',
+    accountDeletePrompt:
+      'Delete this account? This action cannot be undone.',
+    accountDeleteSuccess:
+      'Your account was deleted and this device was signed out.',
+    accountDeleteError: 'Unable to delete your account.',
     checkoutError: 'Unable to start the checkout flow.',
     checkoutVerifiedTitle: 'Payment verified',
     checkoutVerifiedBody:
@@ -767,6 +878,17 @@ function App() {
   const [hasAuthConfig, setHasAuthConfig] = useState(true)
   const [supabaseClient, setSupabaseClient] = useState<SupabaseClient | null>(null)
   const [authSession, setAuthSession] = useState<Session | null>(null)
+  const [accountPassword, setAccountPassword] = useState('')
+  const [accountPasswordConfirm, setAccountPasswordConfirm] = useState('')
+  const [accountPasswordNonce, setAccountPasswordNonce] = useState('')
+  const [passwordMessage, setPasswordMessage] = useState('')
+  const [passwordMessageTone, setPasswordMessageTone] = useState<StatusTone>('success')
+  const [deleteConfirmationEmail, setDeleteConfirmationEmail] = useState('')
+  const [deleteMessage, setDeleteMessage] = useState('')
+  const [deleteMessageTone, setDeleteMessageTone] = useState<StatusTone>('success')
+  const [isPasswordNonceSending, setIsPasswordNonceSending] = useState(false)
+  const [isPasswordUpdating, setIsPasswordUpdating] = useState(false)
+  const [isAccountDeleting, setIsAccountDeleting] = useState(false)
 
   const [height, setHeight] = useState('')
   const [weight, setWeight] = useState('')
@@ -817,10 +939,31 @@ function App() {
   const preferredLocale = language === 'ko' ? 'ko-KR' : 'en-US'
   const authenticatedEmail = authSession?.user.email ?? ''
   const isAuthenticated = Boolean(authSession?.user)
+  const authProvider = formatAuthProvider(
+    typeof authSession?.user.app_metadata?.provider === 'string'
+      ? authSession.user.app_metadata.provider
+      : typeof authSession?.user.identities?.[0]?.provider === 'string'
+        ? authSession.user.identities[0].provider
+        : undefined,
+  )
+  const accountCreatedAt = formatAccountTimestamp(
+    authSession?.user.created_at,
+    preferredLocale,
+  )
 
   const setAuthFeedback = (tone: StatusTone, message: string) => {
     setAuthMessageTone(tone)
     setAuthMessage(message)
+  }
+
+  const setPasswordFeedback = (tone: StatusTone, message: string) => {
+    setPasswordMessageTone(tone)
+    setPasswordMessage(message)
+  }
+
+  const setDeleteFeedback = (tone: StatusTone, message: string) => {
+    setDeleteMessageTone(tone)
+    setDeleteMessage(message)
   }
 
   useEffect(() => {
@@ -901,6 +1044,16 @@ function App() {
     if (isAuthenticated) {
       return
     }
+
+    setAccountPassword('')
+    setAccountPasswordConfirm('')
+    setAccountPasswordNonce('')
+    setPasswordMessage('')
+    setDeleteConfirmationEmail('')
+    setDeleteMessage('')
+    setIsPasswordNonceSending(false)
+    setIsPasswordUpdating(false)
+    setIsAccountDeleting(false)
 
     setIsPurchaseVerified(false)
     setPurchaseOrderId('')
@@ -1280,6 +1433,12 @@ function App() {
       clearPurchaseState()
       setAuthPassword('')
       setAuthPasswordConfirm('')
+      setAccountPassword('')
+      setAccountPasswordConfirm('')
+      setAccountPasswordNonce('')
+      setPasswordMessage('')
+      setDeleteConfirmationEmail('')
+      setDeleteMessage('')
       await supabaseClient.auth.signOut()
       setView('account')
       setAuthMode('sign-in')
@@ -1290,6 +1449,159 @@ function App() {
       )
     } finally {
       setIsAuthSubmitting(false)
+    }
+  }
+
+  const handlePasswordReauthentication = async () => {
+    if (!hasAuthConfig) {
+      setPasswordFeedback('error', copy.authConfigMissing)
+      return
+    }
+
+    if (!supabaseClient || !isAuthenticated) {
+      setPasswordFeedback('error', copy.authSessionRequired)
+      return
+    }
+
+    try {
+      setIsPasswordNonceSending(true)
+      setPasswordMessage('')
+
+      const { error } = await supabaseClient.auth.reauthenticate()
+
+      if (error) {
+        throw error
+      }
+
+      setPasswordFeedback('success', copy.accountPasswordNonceSent)
+    } catch (error) {
+      setPasswordFeedback(
+        'error',
+        error instanceof Error ? error.message : copy.authSessionRequired,
+      )
+    } finally {
+      setIsPasswordNonceSending(false)
+    }
+  }
+
+  const handlePasswordUpdate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!hasAuthConfig) {
+      setPasswordFeedback('error', copy.authConfigMissing)
+      return
+    }
+
+    if (!supabaseClient || !isAuthenticated) {
+      setPasswordFeedback('error', copy.authSessionRequired)
+      return
+    }
+
+    if (!accountPassword) {
+      setPasswordFeedback('error', copy.authPasswordRequired)
+      return
+    }
+
+    if (accountPassword.length < 6) {
+      setPasswordFeedback('error', copy.accountPasswordMinLength)
+      return
+    }
+
+    if (accountPassword !== accountPasswordConfirm) {
+      setPasswordFeedback('error', copy.authPasswordsMismatch)
+      return
+    }
+
+    try {
+      setIsPasswordUpdating(true)
+      setPasswordMessage('')
+
+      const { error } = await supabaseClient.auth.updateUser({
+        password: accountPassword,
+        ...(accountPasswordNonce.trim() ? { nonce: accountPasswordNonce.trim() } : {}),
+      })
+
+      if (error) {
+        throw error
+      }
+
+      setAccountPassword('')
+      setAccountPasswordConfirm('')
+      setAccountPasswordNonce('')
+      setPasswordFeedback('success', copy.accountPasswordUpdated)
+    } catch (error) {
+      setPasswordFeedback(
+        'error',
+        error instanceof Error ? error.message : copy.authSessionRequired,
+      )
+    } finally {
+      setIsPasswordUpdating(false)
+    }
+  }
+
+  const handleDeleteAccount = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!hasAuthConfig) {
+      setDeleteFeedback('error', copy.authConfigMissing)
+      return
+    }
+
+    if (!supabaseClient || !isAuthenticated || !authenticatedEmail) {
+      setDeleteFeedback('error', copy.authSessionRequired)
+      return
+    }
+
+    if (deleteConfirmationEmail.trim().toLowerCase() !== authenticatedEmail.trim().toLowerCase()) {
+      setDeleteFeedback('error', copy.accountDeleteMismatch)
+      return
+    }
+
+    if (!window.confirm(copy.accountDeletePrompt)) {
+      return
+    }
+
+    try {
+      setIsAccountDeleting(true)
+      setDeleteMessage('')
+
+      const response = await fetchWithAuth('/api/delete-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          preferredLocale,
+        }),
+      })
+
+      const data = await parseResponseJson<DeleteAccountResponse>(response)
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? copy.accountDeleteError)
+      }
+
+      clearPendingCheckout()
+      clearPendingEntryView()
+      clearPurchaseState()
+      setDeleteConfirmationEmail('')
+      setAccountPassword('')
+      setAccountPasswordConfirm('')
+      setAccountPasswordNonce('')
+      setPasswordMessage('')
+      setDeleteMessage('')
+      await supabaseClient.auth.signOut({ scope: 'local' })
+      setAuthSession(null)
+      setAuthMode('sign-in')
+      setView('account')
+      setAuthFeedback('success', data?.message ?? copy.accountDeleteSuccess)
+    } catch (error) {
+      setDeleteFeedback(
+        'error',
+        error instanceof Error ? error.message : copy.accountDeleteError,
+      )
+    } finally {
+      setIsAccountDeleting(false)
     }
   }
 
@@ -2447,6 +2759,160 @@ function App() {
     )
   }
 
+  const renderAccountManagement = () => {
+    if (!isAuthenticated) {
+      return null
+    }
+
+    return (
+      <>
+        <section className="utility-card account-settings-card">
+          <div className="utility-copy">
+            <div className="utility-icon">
+              <PersonIcon className="utility-icon-svg" />
+            </div>
+            <div>
+              <h4>{copy.accountProfileTitle}</h4>
+              <p>{copy.accountProfileBody}</p>
+            </div>
+          </div>
+          <div className="account-info-grid">
+            <p className="delivery-target">
+              <strong>{copy.accountEmailLabel}</strong>
+              <span>{authenticatedEmail || copy.accountUnavailable}</span>
+            </p>
+            <p className="delivery-target">
+              <strong>{copy.accountProviderLabel}</strong>
+              <span>{authProvider || copy.accountUnavailable}</span>
+            </p>
+            <p className="delivery-target">
+              <strong>{copy.accountCreatedAtLabel}</strong>
+              <span>{accountCreatedAt || copy.accountUnavailable}</span>
+            </p>
+            <p className="delivery-target">
+              <strong>{copy.accountUserIdLabel}</strong>
+              <span>{authSession?.user.id || copy.accountUnavailable}</span>
+            </p>
+          </div>
+        </section>
+
+        <section className="utility-card account-settings-card">
+          <div className="utility-copy">
+            <div className="utility-icon">
+              <CheckIcon className="utility-icon-svg" />
+            </div>
+            <div>
+              <h4>{copy.accountPasswordTitle}</h4>
+              <p>{copy.accountPasswordBody}</p>
+            </div>
+          </div>
+          <form className="stack-form" onSubmit={handlePasswordUpdate}>
+            <label className="metric-field">
+              <span>{copy.accountPasswordLabel}</span>
+              <div className="auth-input-wrap">
+                <input
+                  autoComplete="new-password"
+                  onChange={(event) => setAccountPassword(event.target.value)}
+                  placeholder={copy.accountPasswordPlaceholder}
+                  type="password"
+                  value={accountPassword}
+                />
+              </div>
+            </label>
+            <label className="metric-field">
+              <span>{copy.accountPasswordConfirmLabel}</span>
+              <div className="auth-input-wrap">
+                <input
+                  autoComplete="new-password"
+                  onChange={(event) => setAccountPasswordConfirm(event.target.value)}
+                  placeholder={copy.accountPasswordConfirmPlaceholder}
+                  type="password"
+                  value={accountPasswordConfirm}
+                />
+              </div>
+            </label>
+            <label className="metric-field">
+              <span>{copy.accountPasswordNonceLabel}</span>
+              <div className="auth-input-wrap">
+                <input
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  onChange={(event) => setAccountPasswordNonce(event.target.value)}
+                  placeholder={copy.accountPasswordNoncePlaceholder}
+                  type="text"
+                  value={accountPasswordNonce}
+                />
+              </div>
+            </label>
+            {passwordMessage ? (
+              <p className={`status-message ${passwordMessageTone}`}>{passwordMessage}</p>
+            ) : null}
+            <div className="account-action-grid">
+              <button
+                className="utility-button"
+                disabled={isPasswordNonceSending || isPasswordUpdating}
+                onClick={() => {
+                  void handlePasswordReauthentication()
+                }}
+                type="button"
+              >
+                {isPasswordNonceSending
+                  ? copy.authSubmitting
+                  : copy.accountPasswordNonceAction}
+              </button>
+              <button
+                className="action-button"
+                disabled={isPasswordUpdating || isPasswordNonceSending}
+                type="submit"
+              >
+                {isPasswordUpdating
+                  ? copy.authSubmitting
+                  : copy.accountPasswordAction}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="utility-card account-settings-card danger-card">
+          <div className="utility-copy">
+            <div className="utility-icon">
+              <SparkleIcon className="utility-icon-svg" />
+            </div>
+            <div>
+              <h4>{copy.accountDeleteTitle}</h4>
+              <p>{copy.accountDeleteBody}</p>
+            </div>
+          </div>
+          <form className="stack-form" onSubmit={handleDeleteAccount}>
+            <label className="metric-field">
+              <span>{copy.accountDeleteConfirmLabel}</span>
+              <div className="auth-input-wrap">
+                <input
+                  autoComplete="email"
+                  inputMode="email"
+                  onChange={(event) => setDeleteConfirmationEmail(event.target.value)}
+                  placeholder={copy.accountDeleteConfirmPlaceholder}
+                  type="email"
+                  value={deleteConfirmationEmail}
+                />
+              </div>
+            </label>
+            {deleteMessage ? (
+              <p className={`status-message ${deleteMessageTone}`}>{deleteMessage}</p>
+            ) : null}
+            <button
+              className="utility-button danger-button"
+              disabled={isAccountDeleting}
+              type="submit"
+            >
+              {isAccountDeleting ? copy.authSubmitting : copy.accountDeleteAction}
+            </button>
+          </form>
+        </section>
+      </>
+    )
+  }
+
   const renderAccountPage = () => (
     <>
       {renderAuthCard()}
@@ -2472,6 +2938,8 @@ function App() {
           </div>
         </div>
       </section>
+
+      {renderAccountManagement()}
 
       <section className="utility-card checkout-card">
         <div className="utility-copy">

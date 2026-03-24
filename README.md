@@ -52,6 +52,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=...
 # .dev.vars
 SUPABASE_URL=...
 SUPABASE_PUBLISHABLE_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
 GEMINI_API_KEY=...
 POLAR_ACCESS_TOKEN=...
 POLAR_SERVER=production
@@ -62,7 +63,7 @@ RESEND_REPLY_TO=...
 
 Notes:
 
-- Hosted Supabase projects: use the `publishable key`.
+- Hosted Supabase projects: use the `publishable key` for the browser and keep the `service_role key` only on the server for sensitive account actions like self-delete.
 - Local Supabase CLI / self-hosted stacks: `supabase status` still exposes an `anon key`, so put that value into `VITE_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_PUBLISHABLE_KEY`, or use the legacy fallback env names.
 
 6. Run the app.
@@ -87,6 +88,7 @@ npm run cf:dev
 - The UI now shows a sign-up/sign-in card before users can enter protected flows.
 - Email/password sign-up explicitly sets `emailRedirectTo` to the current app origin and pathname, so confirmation emails return to the running frontend instead of relying only on the Supabase project `site_url`.
 - Google OAuth uses `supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin + window.location.pathname } })`, which fits Supabase's browser-side implicit flow guidance for social login.
+- Signed-in users can now review account metadata, set a password from the account page, and self-delete the account through a server-side endpoint guarded by `SUPABASE_SERVICE_ROLE_KEY`.
 - Cloudflare Functions verify the Supabase bearer token through `SUPABASE_URL/auth/v1/user`, using `SUPABASE_PUBLISHABLE_KEY` by default and `SUPABASE_ANON_KEY` as a fallback.
 - Checkout creation is tied to the signed-in user email.
 - Report email delivery is restricted to the signed-in account email.
