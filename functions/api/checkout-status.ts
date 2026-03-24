@@ -5,6 +5,7 @@ import {
   fetchPolarCustomerStateForIdentity,
   getBaseApiUrl,
   parsePolarJson,
+  POLAR_ONE_TIME_PRODUCT_ID,
   POLAR_SUBSCRIPTION_PRODUCT_ID,
   type PolarApiErrorResponse,
   type PolarCustomerStateResponse,
@@ -29,6 +30,9 @@ type PolarCheckoutStatusResponse = {
   order_id?: string
   customer_id?: string
   customer_email?: string
+  metadata?: {
+    checkout_kind?: string
+  }
   error?: {
     message?: string
   }
@@ -116,11 +120,25 @@ export async function onRequestGet(context: PagesContext) {
     )
   }
 
+  const productId = polarJson.product_id ?? ''
+  const checkoutKind =
+    polarJson.metadata?.checkout_kind === 'subscription'
+      ? 'subscription'
+      : polarJson.metadata?.checkout_kind === 'one_time'
+        ? 'one_time'
+        : productId === POLAR_SUBSCRIPTION_PRODUCT_ID
+          ? 'subscription'
+          : 'one_time'
+
   let hasAccess = false
   let subscriptionStatus: 'inactive' | 'trialing' | 'active' = 'inactive'
   let customerEmail = polarJson.customer_email ?? authenticatedUser.email ?? ''
 
-  if (polarJson.status === 'succeeded') {
+  if (polarJson.status === 'succeeded' && checkoutKind === 'one_time') {
+    hasAccess = productId === POLAR_ONE_TIME_PRODUCT_ID || !productId
+  }
+
+  if (polarJson.status === 'succeeded' && checkoutKind === 'subscription') {
     const customerState = await fetchPolarCustomerStateForIdentity({
       env,
       externalCustomerId: authenticatedUser.id,
@@ -160,7 +178,12 @@ export async function onRequestGet(context: PagesContext) {
 
   return Response.json({
     status: polarJson.status,
-    productId: polarJson.product_id ?? POLAR_SUBSCRIPTION_PRODUCT_ID,
+    checkoutKind,
+    productId:
+      productId ||
+      (checkoutKind === 'subscription'
+        ? POLAR_SUBSCRIPTION_PRODUCT_ID
+        : POLAR_ONE_TIME_PRODUCT_ID),
     orderId: polarJson.order_id ?? '',
     customerEmail,
     hasAccess,

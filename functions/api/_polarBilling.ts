@@ -58,6 +58,9 @@ export type BillingAccessSnapshot = {
   customerEmail: string
 }
 
+export const POLAR_ONE_TIME_PRODUCT_ID =
+  '82fb5b93-ef0a-4af0-914c-05aaf8882da2'
+
 export const POLAR_SUBSCRIPTION_PRODUCT_ID =
   'f417ba31-0bf8-4e38-9367-334264abeb43'
 

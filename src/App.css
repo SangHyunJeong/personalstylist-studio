@@ -1137,6 +1137,20 @@
   text-transform: uppercase;
 }
 
+.account-summary-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text-body);
+  line-height: 1.65;
+}
+
+.account-summary-list li::marker {
+  color: var(--accent-primary);
+  font-weight: 800;
+}
+
 .checkout-button {
   background: var(--accent-primary);
   color: #fff;

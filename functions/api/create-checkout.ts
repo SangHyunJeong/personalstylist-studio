@@ -1,5 +1,9 @@
 import { requireAuthenticatedUser } from './_supabaseAuth'
-import { POLAR_SUBSCRIPTION_PRODUCT_ID, getBaseApiUrl } from './_polarBilling'
+import {
+  POLAR_ONE_TIME_PRODUCT_ID,
+  POLAR_SUBSCRIPTION_PRODUCT_ID,
+  getBaseApiUrl,
+} from './_polarBilling'
 
 interface Env {
   POLAR_ACCESS_TOKEN?: string
@@ -44,6 +48,7 @@ export async function onRequestPost(context: PagesContext) {
   let body: {
     preferredLocale?: string
     currentUrl?: string
+    checkoutKind?: 'one_time' | 'subscription'
   }
 
   try {
@@ -56,6 +61,12 @@ export async function onRequestPost(context: PagesContext) {
   }
 
   const { preferredLocale, currentUrl } = body
+  const checkoutKind =
+    body.checkoutKind === 'subscription' ? 'subscription' : 'one_time'
+  const productId =
+    checkoutKind === 'subscription'
+      ? POLAR_SUBSCRIPTION_PRODUCT_ID
+      : POLAR_ONE_TIME_PRODUCT_ID
 
   if (!currentUrl) {
     return jsonResponse(
@@ -101,12 +112,12 @@ export async function onRequestPost(context: PagesContext) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      products: [POLAR_SUBSCRIPTION_PRODUCT_ID],
+      products: [productId],
       customer_email: authenticatedUser.email,
       external_customer_id: authenticatedUser.id,
       metadata: {
         supabase_user_id: authenticatedUser.id,
-        checkout_kind: 'subscription',
+        checkout_kind: checkoutKind,
       },
       success_url: successUrl.toString(),
       return_url: returnUrl.toString(),
@@ -125,8 +136,12 @@ export async function onRequestPost(context: PagesContext) {
         error:
           polarJson?.error?.message ??
           (isKoreanLocale(preferredLocale)
-            ? 'Polar 구독 체크아웃 세션을 생성하지 못했습니다.'
-            : 'Unable to create the Polar subscription checkout session.'),
+            ? checkoutKind === 'subscription'
+              ? 'Polar 구독 체크아웃 세션을 생성하지 못했습니다.'
+              : 'Polar 결제 체크아웃 세션을 생성하지 못했습니다.'
+            : checkoutKind === 'subscription'
+              ? 'Unable to create the Polar subscription checkout session.'
+              : 'Unable to create the Polar one-time checkout session.'),
       },
       polarResponse.status || 500,
     )

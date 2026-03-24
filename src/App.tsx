@@ -40,6 +40,7 @@ type CheckoutResponse = {
 
 type CheckoutStatusResponse = {
   status?: string
+  checkoutKind?: 'one_time' | 'subscription'
   productId?: string
   orderId?: string
   customerEmail?: string
@@ -110,11 +111,12 @@ type HairGenerationPayload = {
 type PendingCheckoutPayload = StyleGenerationPayload | HairGenerationPayload
 type ProtectedView = Extract<View, 'style' | 'hair'>
 type BillingAccessPhase = 'inactive' | 'trialing' | 'active'
+type CheckoutKind = 'one_time' | 'subscription'
 
 type Theme = 'light' | 'dark'
 type Language = 'ko' | 'en'
 type AuthMode = 'sign-in' | 'sign-up'
-type AccountSection = 'profile' | 'password' | 'delete'
+type AccountSection = 'subscription' | 'profile' | 'password' | 'delete'
 type StatusTone = 'success' | 'error' | 'fallback'
 type View = 'home' | 'style' | 'hair' | 'account' | LegalView
 
@@ -198,7 +200,10 @@ const getInitialPurchaseVerified = (): boolean => {
     return false
   }
 
-  return window.localStorage.getItem(PURCHASE_VERIFIED_KEY) === 'true'
+  return (
+    window.localStorage.getItem(PURCHASE_VERIFIED_KEY) === 'true' &&
+    Boolean(window.localStorage.getItem(PURCHASE_ORDER_ID_KEY)?.trim())
+  )
 }
 
 const getInitialPurchaseOrderId = (): string => {
@@ -217,8 +222,7 @@ const getInitialPurchaseEmail = (): string => {
   return window.localStorage.getItem(PURCHASE_EMAIL_KEY) ?? ''
 }
 
-const getInitialBillingAccessPhase = (): BillingAccessPhase =>
-  getInitialPurchaseVerified() ? 'active' : 'inactive'
+const getInitialBillingAccessPhase = (): BillingAccessPhase => 'inactive'
 
 const getAuthRedirectUrl = (): string | undefined => {
   if (typeof window === 'undefined') {
@@ -345,6 +349,7 @@ const localeCopy = {
     authSignUpSuccess:
       '회원가입 요청이 완료되었습니다. 이메일 확인이 필요한 경우 받은편지함을 확인해 주세요.',
     authCheckoutRequired: '결제를 시작하려면 먼저 로그인해 주세요.',
+    purchaseCheckoutError: '단건 결제 체크아웃을 시작하지 못했습니다.',
     noImageSelected: '아직 선택된 이미지가 없습니다.',
     copySuccess: '프롬프트를 클립보드에 복사했습니다.',
     copyFailure: '클립보드 복사에 실패했습니다. 직접 선택해서 복사해 주세요.',
@@ -406,8 +411,8 @@ const localeCopy = {
     styleWeightPlaceholder: '예: 70',
     styleAction: '분석 생성하기',
     styleActionLoading: '스타일 보고서 생성 중...',
-    stylePayAction: '7일 무료 체험 시작하고 분석하기',
-    stylePayActionLoading: '무료 체험 체크아웃 준비 중...',
+    stylePayAction: '단건 결제하고 분석하기',
+    stylePayActionLoading: '단건 결제 체크아웃 준비 중...',
     stylePanelTag: 'AI 스타일 보고서',
     stylePanelTitle: 'AI 자동 스타일 보고서',
     styleEmpty:
@@ -421,14 +426,14 @@ const localeCopy = {
       '드래그 앤 드롭하거나 탭해서 선명한 인물 사진을 업로드하세요.',
     hairAction: '내 스타일 분석하기',
     hairActionLoading: '헤어스타일 추천 생성 중...',
-    hairPayAction: '7일 무료 체험 시작하고 추천받기',
-    hairPayActionLoading: '무료 체험 체크아웃 준비 중...',
+    hairPayAction: '단건 결제하고 추천받기',
+    hairPayActionLoading: '단건 결제 체크아웃 준비 중...',
     hairPanelTag: 'AI 헤어 스타일리스트',
     hairPanelTitle: '3x3 헤어스타일 추천',
     hairEmpty:
       '사진을 업로드하면 3x3 헤어스타일 추천 이미지와 설명이 여기에 표시됩니다.',
     checkoutFlowHint:
-      '지금 버튼을 누르면 Polar 구독 체크아웃으로 이동합니다. 7일 무료 체험 또는 활성 구독이 확인되면 같은 입력값으로 생성이 자동 이어집니다.',
+      '지금 버튼을 누르면 단건 Polar 체크아웃으로 이동합니다. 결제가 완료되면 같은 입력값으로 생성이 자동 이어집니다.',
     hairPromptTitle: '생성형 AI 프롬프트',
     hairPromptDescription:
       'ChatGPT, Gemini 또는 다른 이미지 생성 도구에서 다시 시도할 수 있도록 프롬프트를 복사합니다.',
@@ -437,24 +442,35 @@ const localeCopy = {
     topbarAccount: '계정 및 액세스',
     checkoutTitle: '7일 무료 체험으로 시작',
     checkoutDescription:
-      'Polar 구독 체크아웃으로 7일 무료 체험을 시작하면 체형 스타일 보고서와 헤어 추천 흐름을 바로 사용할 수 있습니다. 무료 체험 또는 활성 구독이 확인된 계정에서만 디지털 액세스가 열립니다.',
+      '7일 무료 체험 또는 활성 구독이 확인되면 매일 아침 6시 기준 날씨 기반 스타일 브리프를 받을 수 있습니다.',
     checkoutButton: '7일 무료 체험 시작',
     checkoutLoading: '무료 체험 체크아웃 준비 중...',
     checkoutStatusLabel: '현재 구독 액세스 상태',
-    checkoutLockedTitle: '무료 체험 또는 구독이 아직 활성화되지 않았습니다',
+    checkoutLockedTitle: '아직 구독이 활성화되지 않았습니다',
     checkoutLockedBody:
-      '7일 무료 체험 또는 활성 구독이 확인되면 체형 스타일 보고서와 헤어스타일링 추천을 바로 생성할 수 있습니다.',
-    checkoutVerifiedStatus: '활성 구독이 확인되어 이 계정에서 두 생성 흐름을 바로 사용할 수 있습니다.',
-    checkoutTrialStatus: '7일 무료 체험이 활성화되어 이 계정에서 두 생성 흐름을 바로 사용할 수 있습니다.',
+      '7일 무료 체험 또는 활성 구독이 확인되면 매일 아침 날씨 기반 스타일 브리프를 받을 수 있습니다.',
+    checkoutVerifiedStatus: '활성 구독이 확인되어 매일 아침 스타일 브리프가 발송됩니다.',
+    checkoutTrialStatus: '7일 무료 체험이 활성화되어 매일 아침 스타일 브리프를 받을 수 있습니다.',
     checkoutPendingStatus:
-      '체크아웃은 돌아왔지만 Polar 구독 권한 부여가 아직 반영되지 않았습니다. 잠시 후 상태가 다시 동기화됩니다.',
+      '체크아웃 후 돌아왔지만 Polar가 아직 무료 체험 또는 구독 권한을 반영하는 중입니다.',
     accountPageTag: 'ACCOUNT',
-    accountPageTitle: '계정과 구독 액세스를 관리하세요',
+    accountPageTitle: '계정과 일일 스타일 구독 관리',
     accountPageBody:
-      '여기에서 로그인한 계정으로 Polar 구독 체크아웃, 무료 체험, 결과 이메일 전송, 매일 아침 6시 날씨 기반 스타일 브리프까지 같은 흐름으로 관리할 수 있습니다.',
-    accountProfileTitle: '내 정보',
+      '단건 결제는 STYLE과 HAIR에서 각각 진행되고, 여기 구독은 매일 아침 날씨 기반 스타일 브리프용으로만 관리됩니다.',
+    accountPageOrderTitle: '추천 순서',
+    accountPageOrderStep1: '같은 이메일 계정으로 로그인 상태를 확인합니다.',
+    accountPageOrderStep2: '구독 섹션에서 7일 무료 체험 또는 월 구독 상태를 확인합니다.',
+    accountPageOrderStep3: '키, 몸무게, 위치, 기준 사진을 저장해 아침 브리프를 준비합니다.',
+    accountPageOrderStep4: '비밀번호 변경과 계정 탈퇴는 마지막 섹션에서 관리합니다.',
+    accountSubscriptionTitle: '매일 아침 스타일 브리프 구독',
+    accountSubscriptionBody:
+      '이 구독은 매일 아침 6시에 날씨와 저장된 프로필을 바탕으로 스타일 브리프를 보내는 용도입니다.',
+    accountSubscriptionSeparateNote:
+      'STYLE 체형 보고서와 HAIR 추천은 이 구독에 포함되지 않으며, 각 페이지에서 단건 결제로 별도 진행됩니다.',
+    accountSubscriptionSummaryLocked: '아직 무료 체험 또는 구독이 활성화되지 않았습니다.',
+    accountProfileTitle: '내 정보 및 브리프 설정',
     accountProfileBody:
-      '현재 로그인된 계정, 일일 스타일 브리프 설정, 저장된 프로필 사진을 관리합니다.',
+      '현재 로그인 계정과 일일 스타일 브리프에 쓰는 프로필 정보를 정리합니다.',
     accountEmailLabel: '이메일',
     accountProviderLabel: '로그인 방식',
     accountUserIdLabel: '사용자 ID',
@@ -522,13 +538,13 @@ const localeCopy = {
     checkoutError: '구독 체크아웃을 시작하지 못했습니다.',
     checkoutVerifiedTitle: '구독 활성화 완료',
     checkoutVerifiedBody:
-      '활성 구독이 확인되었습니다. 이 계정에서는 두 AI 생성 흐름을 바로 사용할 수 있습니다.',
+      '활성 구독이 확인되었습니다. 매일 아침 스타일 브리프가 이 계정 기준으로 발송됩니다.',
     checkoutTrialTitle: '무료 체험 활성화 완료',
     checkoutTrialBody:
-      '7일 무료 체험이 확인되었습니다. 이 계정에서는 두 AI 생성 흐름을 바로 사용할 수 있습니다.',
+      '7일 무료 체험이 확인되었습니다. 무료 체험 기간 동안 매일 아침 스타일 브리프를 받을 수 있습니다.',
     checkoutPendingTitle: '구독 권한 확인 대기 중',
     checkoutPendingBody:
-      '체크아웃 후 돌아왔지만 Polar에서 아직 무료 체험 또는 구독 권한을 확정하지 않았습니다. 잠시 후 다시 시도해 주세요.',
+      '체크아웃 후 돌아왔지만 Polar에서 아직 무료 체험 또는 구독 권한을 확정하지 않았습니다. 잠시 후 다시 동기화됩니다.',
     navHome: 'HOME',
     navStyle: 'STYLE',
     navHair: 'HAIR',
@@ -575,6 +591,7 @@ const localeCopy = {
     authSignUpSuccess:
       'Your sign-up request was submitted. Check your inbox if email confirmation is enabled.',
     authCheckoutRequired: 'Please sign in before starting checkout.',
+    purchaseCheckoutError: 'Unable to start the one-time checkout flow.',
     noImageSelected: 'No image selected yet.',
     copySuccess: 'Prompt copied to your clipboard.',
     copyFailure: 'Clipboard copy failed. Please copy it manually.',
@@ -636,8 +653,8 @@ const localeCopy = {
     styleWeightPlaceholder: 'e.g. 70',
     styleAction: 'Generate Analysis',
     styleActionLoading: 'Generating Analysis...',
-    stylePayAction: 'Start Free Trial and Generate',
-    stylePayActionLoading: 'Preparing free-trial checkout...',
+    stylePayAction: 'Pay Once and Generate',
+    stylePayActionLoading: 'Preparing one-time checkout...',
     stylePanelTag: 'AI Style Report',
     stylePanelTitle: 'AI Automated Style Report',
     styleEmpty:
@@ -651,14 +668,14 @@ const localeCopy = {
       'Drag and drop or tap to upload a clear portrait for AI hair analysis.',
     hairAction: 'Analyze My Look',
     hairActionLoading: 'Analyzing My Look...',
-    hairPayAction: 'Start Free Trial and Analyze',
-    hairPayActionLoading: 'Preparing free-trial checkout...',
+    hairPayAction: 'Pay Once and Analyze',
+    hairPayActionLoading: 'Preparing one-time checkout...',
     hairPanelTag: 'AI Hair Stylist',
     hairPanelTitle: '3x3 Hairstyle Recommendations',
     hairEmpty:
       'Upload your photo to see the 3x3 hairstyle grid and recommendation details here.',
     checkoutFlowHint:
-      'When you submit, Polar subscription checkout opens first. As soon as your 7-day free trial or active subscription is confirmed, generation resumes automatically with the same inputs.',
+      'When you submit, a one-time Polar checkout opens first. As soon as the payment completes, generation resumes automatically with the same inputs.',
     hairPromptTitle: 'Generative Prompt',
     hairPromptDescription:
       'Copy an optimized prompt to try the hairstyle generation again in ChatGPT, Gemini, or another image tool.',
@@ -667,25 +684,36 @@ const localeCopy = {
     topbarAccount: 'Account & Access',
     checkoutTitle: 'Start with a 7-day free trial',
     checkoutDescription:
-      'Begin a 7-day free trial through Polar subscription checkout to unlock both the body style report and hairstyling recommendation flows. Digital access opens only for accounts with an active trial or subscription.',
+      'Start a 7-day free trial or monthly subscription to receive the daily weather-based style brief every morning.',
     checkoutButton: 'Start 7-Day Free Trial',
     checkoutLoading: 'Preparing free-trial checkout...',
     checkoutStatusLabel: 'Current subscription access',
     checkoutLockedTitle: 'No free trial or subscription is active yet',
     checkoutLockedBody:
-      'Once your 7-day free trial or active subscription is confirmed, both generation flows are available immediately.',
+      'Once your 7-day free trial or active subscription is confirmed, the daily morning style brief becomes available.',
     checkoutVerifiedStatus:
-      'An active subscription is confirmed, so both generation flows are available on this account.',
-    checkoutTrialStatus: 'Your 7-day free trial is active, so both generation flows are available on this account.',
+      'An active subscription is confirmed, so the daily morning style brief is enabled for this account.',
+    checkoutTrialStatus: 'Your 7-day free trial is active, so the daily morning style brief is enabled for this account.',
     checkoutPendingStatus:
-      'You returned from checkout, but Polar has not finished granting subscription access yet. The status will sync again shortly.',
+      'You returned from checkout, but Polar is still confirming the free trial or subscription access.',
     accountPageTag: 'ACCOUNT',
-    accountPageTitle: 'Manage your account and subscription access',
+    accountPageTitle: 'Manage your account and daily style subscription',
     accountPageBody:
-      'Use the same signed-in account here for Polar subscription checkout, free trial access, generation, result delivery, and the daily 6:00 AM weather-based style brief.',
-    accountProfileTitle: 'My details',
+      'One-time purchases stay on the STYLE and HAIR pages. This page only manages the daily weather-based style brief subscription.',
+    accountPageOrderTitle: 'Recommended order',
+    accountPageOrderStep1: 'Confirm you are signed in with the same email you will use for checkout.',
+    accountPageOrderStep2: 'Check the subscription section for the 7-day free trial or active monthly plan.',
+    accountPageOrderStep3: 'Save height, weight, location, and a reference photo for the morning brief.',
+    accountPageOrderStep4: 'Manage password updates and account deletion last.',
+    accountSubscriptionTitle: 'Daily morning style brief subscription',
+    accountSubscriptionBody:
+      'This subscription is only for the daily 6:00 AM weather-based style brief built from your saved profile.',
+    accountSubscriptionSeparateNote:
+      'The STYLE body report and HAIR recommendation are not included here. They remain separate one-time purchases on their own pages.',
+    accountSubscriptionSummaryLocked: 'No free trial or subscription is active yet.',
+    accountProfileTitle: 'My details and brief settings',
     accountProfileBody:
-      'Review the signed-in account, daily style brief settings, and the saved reference photo used for morning delivery.',
+      'Review the signed-in account and the saved profile used for daily morning delivery.',
     accountEmailLabel: 'Email',
     accountProviderLabel: 'Sign-in method',
     accountUserIdLabel: 'User ID',
@@ -753,13 +781,13 @@ const localeCopy = {
     checkoutError: 'Unable to start the subscription checkout flow.',
     checkoutVerifiedTitle: 'Subscription active',
     checkoutVerifiedBody:
-      'Your active subscription has been confirmed. Both AI generation flows are now available on this account.',
+      'Your active subscription has been confirmed. The daily morning style brief is now enabled for this account.',
     checkoutTrialTitle: 'Free trial active',
     checkoutTrialBody:
-      'Your 7-day free trial has been confirmed. Both AI generation flows are now available on this account.',
+      'Your 7-day free trial has been confirmed. The daily morning style brief is now enabled for this account.',
     checkoutPendingTitle: 'Subscription access still pending',
     checkoutPendingBody:
-      'You returned from checkout, but Polar has not finished confirming the free trial or subscription access yet. Please try again in a moment.',
+      'You returned from checkout, but Polar has not finished confirming the free trial or subscription access yet. Please try again shortly.',
     navHome: 'HOME',
     navStyle: 'STYLE',
     navHair: 'HAIR',
@@ -1113,6 +1141,7 @@ function App() {
   const [isHairLoading, setIsHairLoading] = useState(false)
   const [isHairDragging, setIsHairDragging] = useState(false)
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false)
+  const [activeCheckoutKind, setActiveCheckoutKind] = useState<CheckoutKind | null>(null)
   const [checkoutErrorMessage, setCheckoutErrorMessage] = useState('')
   const [checkoutStatus, setCheckoutStatus] = useState<'idle' | 'pending' | 'verified'>('idle')
   const [checkoutStatusMessage, setCheckoutStatusMessage] = useState('')
@@ -1164,18 +1193,21 @@ function App() {
         copy.accountProfileBody
   const accountPasswordSummary = passwordMessage || copy.accountPasswordBody
   const accountDeleteSummary = deleteMessage || copy.accountDeleteBody
-  const checkoutActiveTitle =
-    billingAccessPhase === 'trialing'
-      ? copy.checkoutTrialTitle
-      : copy.checkoutVerifiedTitle
+  const accountSubscriptionSummary =
+    checkoutErrorMessage ||
+    (!isAuthenticated
+      ? copy.authCheckoutRequired
+      : checkoutStatus === 'pending'
+        ? checkoutStatusMessage || copy.checkoutPendingStatus
+        : billingAccessPhase === 'trialing'
+          ? copy.checkoutTrialStatus
+          : billingAccessPhase === 'active'
+            ? copy.checkoutVerifiedStatus
+            : copy.accountSubscriptionSummaryLocked)
   const checkoutActiveBody =
     billingAccessPhase === 'trialing'
       ? copy.checkoutTrialBody
       : copy.checkoutVerifiedBody
-  const checkoutActiveStatus =
-    billingAccessPhase === 'trialing'
-      ? copy.checkoutTrialStatus
-      : copy.checkoutVerifiedStatus
 
   const setAuthFeedback = (tone: StatusTone, message: string) => {
     setAuthMessageTone(tone)
@@ -1558,12 +1590,8 @@ function App() {
     window.localStorage.removeItem(PURCHASE_ORDER_ID_KEY)
     window.localStorage.removeItem(PURCHASE_EMAIL_KEY)
     setIsPurchaseVerified(false)
-    setBillingAccessPhase('inactive')
     setPurchaseOrderId('')
     setPurchaseEmail('')
-    setCheckoutStatus('idle')
-    setCheckoutStatusMessage('')
-    setCheckoutErrorMessage('')
   }
 
   const persistPendingCheckout = (payload: PendingCheckoutPayload) => {
@@ -2182,28 +2210,21 @@ function App() {
           data?.subscriptionStatus,
           hasAccess,
         )
-        const nextEmail = data?.customerEmail?.trim() || (hasAccess ? authenticatedEmail : '')
+        const nextEmail = data?.customerEmail?.trim() || authenticatedEmail
 
         setBillingAccessPhase(nextPhase)
-        setPurchaseEmail(nextEmail)
         setCheckoutErrorMessage('')
 
         if (hasAccess) {
-          setIsPurchaseVerified(true)
           setCheckoutStatus('verified')
           setCheckoutStatusMessage(
             nextPhase === 'trialing'
               ? copy.checkoutTrialBody
               : copy.checkoutVerifiedBody,
           )
-        } else {
-          setIsPurchaseVerified(false)
-          setPurchaseOrderId('')
-
-          if (!preservePendingState) {
-            setCheckoutStatus('idle')
-            setCheckoutStatusMessage('')
-          }
+        } else if (!preservePendingState) {
+          setCheckoutStatus('idle')
+          setCheckoutStatusMessage('')
         }
 
         return {
@@ -2514,20 +2535,11 @@ function App() {
         photoName: stylePhotoFile.name,
       }
 
-      let hasAccess = isPurchaseVerified
-
-      if (!hasAccess) {
-        const accessSnapshot = await syncBillingAccess({
-          suppressErrors: true,
-          preservePendingState: true,
-        })
-
-        hasAccess = Boolean(accessSnapshot?.hasAccess)
-      }
-
-      if (!hasAccess) {
+      if (!isPurchaseVerified) {
         persistPendingCheckout(payload)
-        await startCheckout()
+        await startCheckout('one_time', {
+          onError: (message) => setStyleErrorMessage(message),
+        })
         return
       }
 
@@ -2563,20 +2575,11 @@ function App() {
         photoName: hairPhotoFile.name,
       }
 
-      let hasAccess = isPurchaseVerified
-
-      if (!hasAccess) {
-        const accessSnapshot = await syncBillingAccess({
-          suppressErrors: true,
-          preservePendingState: true,
-        })
-
-        hasAccess = Boolean(accessSnapshot?.hasAccess)
-      }
-
-      if (!hasAccess) {
+      if (!isPurchaseVerified) {
         persistPendingCheckout(payload)
-        await startCheckout()
+        await startCheckout('one_time', {
+          onError: (message) => setHairErrorMessage(message),
+        })
         return
       }
 
@@ -2881,8 +2884,6 @@ function App() {
   }
 
   const beginProtectedEntry = async (targetView: ProtectedView) => {
-    setCheckoutErrorMessage('')
-
     if (!hasAuthConfig) {
       setAuthFeedback('error', copy.authConfigMissing)
       setView('account')
@@ -2906,22 +2907,26 @@ function App() {
       return
     }
 
-    const accessSnapshot = await syncBillingAccess({
-      suppressErrors: true,
-      preservePendingState: true,
-    })
-
-    if (accessSnapshot?.hasAccess) {
-      setView(targetView)
-      return
-    }
-
     clearPendingCheckout()
     persistPendingEntryView(targetView)
-    await startCheckout()
+    await startCheckout('one_time', {
+      onError: (message) => {
+        if (targetView === 'style') {
+          setStyleErrorMessage(message)
+        } else {
+          setHairErrorMessage(message)
+        }
+        setView(targetView)
+      },
+    })
   }
 
-  const startCheckout = async () => {
+  const startCheckout = async (
+    checkoutKind: CheckoutKind,
+    options?: {
+      onError?: (message: string) => void
+    },
+  ) => {
     if (!hasAuthConfig) {
       setAuthFeedback('error', copy.authConfigMissing)
       setView('account')
@@ -2942,7 +2947,11 @@ function App() {
 
     try {
       setIsCheckoutLoading(true)
-      setCheckoutErrorMessage('')
+      setActiveCheckoutKind(checkoutKind)
+
+      if (checkoutKind === 'subscription') {
+        setCheckoutErrorMessage('')
+      }
 
       const response = await fetchWithAuth('/api/create-checkout', {
         method: 'POST',
@@ -2952,21 +2961,36 @@ function App() {
         body: JSON.stringify({
           preferredLocale,
           currentUrl: window.location.href,
+          checkoutKind,
         }),
       })
 
       const data = await parseResponseJson<CheckoutResponse>(response)
+      const fallbackMessage =
+        checkoutKind === 'subscription'
+          ? copy.checkoutError
+          : copy.purchaseCheckoutError
 
       if (!response.ok || !data?.url) {
-        throw new Error(data?.error ?? copy.checkoutError)
+        throw new Error(data?.error ?? fallbackMessage)
       }
 
       window.location.href = data.url
     } catch (error) {
-      setCheckoutErrorMessage(
-        error instanceof Error ? error.message : copy.checkoutError,
-      )
+      const message =
+        error instanceof Error
+          ? error.message
+          : checkoutKind === 'subscription'
+            ? copy.checkoutError
+            : copy.purchaseCheckoutError
+
+      if (checkoutKind === 'subscription') {
+        setCheckoutErrorMessage(message)
+      }
+
+      options?.onError?.(message)
       setIsCheckoutLoading(false)
+      setActiveCheckoutKind(null)
     }
   }
 
@@ -2991,6 +3015,12 @@ function App() {
 
     let isCancelled = false
 
+    const clearCheckoutQuery = () => {
+      url.searchParams.delete('checkout')
+      url.searchParams.delete('checkout_id')
+      window.history.replaceState(null, '', url.toString())
+    }
+
     const verifyCheckout = async () => {
       try {
         const response = await fetchWithAuth(
@@ -3009,49 +3039,55 @@ function App() {
           return
         }
 
+        if (data.checkoutKind === 'one_time') {
+          if (data.status === 'succeeded' && data.hasAccess) {
+            setIsPurchaseVerified(true)
+            setPurchaseOrderId(data.orderId ?? '')
+            setPurchaseEmail(data.customerEmail ?? authenticatedEmail)
+
+            const pendingCheckout = readPendingCheckout()
+            const pendingEntryView = readPendingEntryView()
+            clearPendingCheckout()
+            clearPendingEntryView()
+            setActiveCheckoutKind(null)
+            setIsCheckoutLoading(false)
+            clearCheckoutQuery()
+
+            if (pendingCheckout) {
+              await resumePendingCheckout(
+                pendingCheckout,
+                data.customerEmail ?? authenticatedEmail,
+              )
+            } else if (pendingEntryView) {
+              setView(pendingEntryView)
+            }
+          }
+
+          return
+        }
+
         const hasAccess = Boolean(data.hasAccess)
         const nextPhase = normalizeBillingAccessPhase(
           data.subscriptionStatus,
           hasAccess,
         )
 
+        setBillingAccessPhase(nextPhase)
+        setActiveCheckoutKind(null)
+        setIsCheckoutLoading(false)
+        setCheckoutErrorMessage('')
+        clearCheckoutQuery()
+
         if (data.status === 'succeeded' && hasAccess) {
-          setBillingAccessPhase(nextPhase)
           setCheckoutStatus('verified')
           setCheckoutStatusMessage(
             nextPhase === 'trialing'
               ? copy.checkoutTrialBody
               : copy.checkoutVerifiedBody,
           )
-          setCheckoutErrorMessage('')
-          setIsPurchaseVerified(true)
-          setPurchaseOrderId(data.orderId ?? '')
-          setPurchaseEmail(data.customerEmail ?? authenticatedEmail)
-
-          const pendingCheckout = readPendingCheckout()
-          const pendingEntryView = readPendingEntryView()
-          clearPendingCheckout()
-          clearPendingEntryView()
-
-          if (pendingCheckout) {
-            await resumePendingCheckout(
-              pendingCheckout,
-              data.customerEmail ?? authenticatedEmail,
-            )
-          } else if (pendingEntryView) {
-            setView(pendingEntryView)
-          }
-
-          url.searchParams.delete('checkout')
-          url.searchParams.delete('checkout_id')
-          window.history.replaceState(null, '', url.toString())
           return
         }
 
-        setBillingAccessPhase('inactive')
-        setIsPurchaseVerified(false)
-        setPurchaseOrderId('')
-        setPurchaseEmail('')
         setCheckoutStatus('pending')
         setCheckoutStatusMessage(copy.checkoutPendingBody)
       } catch (error) {
@@ -3059,6 +3095,8 @@ function App() {
           return
         }
 
+        setActiveCheckoutKind(null)
+        setIsCheckoutLoading(false)
         setCheckoutStatus('pending')
         setCheckoutStatusMessage(
           error instanceof Error ? error.message : copy.checkoutError,
@@ -3391,28 +3429,23 @@ function App() {
   }
 
   const renderCheckoutStatusCard = () => {
-    if (checkoutStatus === 'idle' && !checkoutErrorMessage) {
+    if (!isAuthenticated) {
       return null
     }
 
+    const statusMessage =
+      checkoutErrorMessage ||
+      (checkoutStatus === 'pending'
+        ? checkoutStatusMessage || copy.checkoutPendingBody
+        : billingAccessPhase === 'trialing' || billingAccessPhase === 'active'
+          ? checkoutActiveBody
+          : copy.checkoutLockedBody)
+
     return (
-      <section className="utility-card checkout-status-card">
-        <div className="utility-copy">
-          <div className="utility-icon">
-            <SparkleIcon className="utility-icon-svg" />
-          </div>
-          <div>
-            <h4>
-              {checkoutErrorMessage
-                ? copy.checkoutTitle
-                : checkoutStatus === 'verified'
-                ? checkoutActiveTitle
-                : copy.checkoutPendingTitle}
-            </h4>
-            <p>{checkoutErrorMessage || checkoutStatusMessage}</p>
-          </div>
-        </div>
-      </section>
+      <div className="billing-status-card">
+        <strong>{copy.checkoutStatusLabel}</strong>
+        <p className="rich-paragraph">{statusMessage}</p>
+      </div>
     )
   }
 
@@ -3423,6 +3456,58 @@ function App() {
 
     return (
       <>
+        <section
+          className="utility-card account-settings-card"
+          data-open={openAccountSection === 'subscription' ? 'true' : 'false'}
+        >
+          <button
+            aria-controls="account-subscription-panel"
+            aria-expanded={openAccountSection === 'subscription'}
+            className="account-accordion-button"
+            onClick={() => toggleAccountSection('subscription')}
+            type="button"
+          >
+            <div className="utility-copy">
+              <div className="utility-icon">
+                <SparkleIcon className="utility-icon-svg" />
+              </div>
+              <div>
+                <h4>{copy.accountSubscriptionTitle}</h4>
+                <p>{accountSubscriptionSummary}</p>
+              </div>
+            </div>
+            <ChevronDownIcon className="account-accordion-chevron" />
+          </button>
+          <div className="account-accordion-panel" id="account-subscription-panel">
+            <div className="account-accordion-panel-inner">
+              <div className="account-accordion-content">
+                <p className="account-inline-note">{copy.accountSubscriptionBody}</p>
+                {renderCheckoutStatusCard()}
+                <p className="account-inline-note">{copy.accountSubscriptionSeparateNote}</p>
+                {billingAccessPhase === 'inactive' && checkoutStatus !== 'pending' ? (
+                  <button
+                    className="utility-button checkout-button"
+                    disabled={
+                      isCheckoutLoading && activeCheckoutKind === 'subscription'
+                    }
+                    onClick={() => {
+                      void startCheckout('subscription')
+                    }}
+                    type="button"
+                  >
+                    <SparkleIcon className="button-icon" />
+                    <span>
+                      {isCheckoutLoading && activeCheckoutKind === 'subscription'
+                        ? copy.checkoutLoading
+                        : copy.checkoutButton}
+                    </span>
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section
           className="utility-card account-settings-card"
           data-open={openAccountSection === 'profile' ? 'true' : 'false'}
@@ -3759,70 +3844,30 @@ function App() {
     <>
       {renderAuthCard()}
 
-      <section className="panel report-card">
-        <div className="report-card-header">
-          <span className="panel-tag">{copy.accountPageTag}</span>
-          <h3>{copy.accountPageTitle}</h3>
-        </div>
-        <div className="rich-content">
-          <p className="rich-paragraph">{copy.accountPageBody}</p>
-          <div className="billing-status-card">
-            <strong>{copy.checkoutStatusLabel}</strong>
-            <p className="rich-paragraph">
-              {!isAuthenticated
-                ? copy.authCheckoutRequired
-                : isPurchaseVerified
-                ? checkoutActiveStatus
-                : checkoutStatus === 'pending'
-                  ? copy.checkoutPendingStatus
-                  : copy.checkoutLockedBody}
-            </p>
-          </div>
-        </div>
-      </section>
+      {isAuthenticated ? (
+        <>
+          <section className="panel report-card account-page-summary">
+            <div className="report-card-header">
+              <span className="panel-tag">{copy.accountPageTag}</span>
+              <h3>{copy.accountPageTitle}</h3>
+            </div>
+            <div className="rich-content">
+              <p className="rich-paragraph">{copy.accountPageBody}</p>
+              <div className="billing-status-card">
+                <strong>{copy.accountPageOrderTitle}</strong>
+                <ol className="account-summary-list">
+                  <li>{copy.accountPageOrderStep1}</li>
+                  <li>{copy.accountPageOrderStep2}</li>
+                  <li>{copy.accountPageOrderStep3}</li>
+                  <li>{copy.accountPageOrderStep4}</li>
+                </ol>
+              </div>
+            </div>
+          </section>
 
-      {renderAccountManagement()}
-
-      <section className="utility-card checkout-card">
-        <div className="utility-copy">
-          <div className="utility-icon">
-            <SparkleIcon className="utility-icon-svg" />
-          </div>
-          <div>
-            <h4>
-              {isPurchaseVerified
-                ? checkoutActiveTitle
-                : checkoutStatus === 'pending'
-                  ? copy.checkoutPendingTitle
-                  : copy.checkoutLockedTitle}
-            </h4>
-            <p>{copy.checkoutDescription}</p>
-          </div>
-        </div>
-        {isPurchaseVerified ? (
-          <p className="status-message success">{checkoutActiveBody}</p>
-        ) : !isAuthenticated ? (
-          <p className="status-message fallback">{copy.authCheckoutRequired}</p>
-        ) : checkoutStatus === 'pending' ? (
-          <p className="status-message fallback">
-            {checkoutStatusMessage || copy.checkoutPendingBody}
-          </p>
-        ) : (
-          <button
-            className="utility-button checkout-button"
-            disabled={isCheckoutLoading}
-            onClick={() => {
-              void startCheckout()
-            }}
-            type="button"
-          >
-            <SparkleIcon className="button-icon" />
-            <span>
-              {isCheckoutLoading ? copy.checkoutLoading : copy.checkoutButton}
-            </span>
-          </button>
-        )}
-      </section>
+          {renderAccountManagement()}
+        </>
+      ) : null}
 
       {renderPolicyLinks()}
     </>
@@ -4045,8 +4090,6 @@ function App() {
             ) : null}
           </section>
 
-          {renderCheckoutStatusCard()}
-
           {view === 'home' ? (
             <>
               <section className="hero-section">
@@ -4187,7 +4230,7 @@ function App() {
                   >
                     {isStyleLoading
                       ? copy.styleActionLoading
-                      : isCheckoutLoading && !isPurchaseVerified
+                      : isCheckoutLoading && activeCheckoutKind === 'one_time' && !isPurchaseVerified
                         ? copy.stylePayActionLoading
                         : isPurchaseVerified
                           ? copy.styleAction
@@ -4302,7 +4345,7 @@ function App() {
                 >
                   {isHairLoading
                     ? copy.hairActionLoading
-                    : isCheckoutLoading && !isPurchaseVerified
+                    : isCheckoutLoading && activeCheckoutKind === 'one_time' && !isPurchaseVerified
                       ? copy.hairPayActionLoading
                       : isPurchaseVerified
                         ? copy.hairAction
