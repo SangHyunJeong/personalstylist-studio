@@ -1,12 +1,13 @@
-import { createClient } from '@supabase/supabase-js'
+import {
+  deleteProfilePhotoFromR2,
+  fetchCustomerStyleProfile,
+  type DailyStylistEnv,
+} from './_dailyStylist'
+import type { SupabaseAuthEnv } from './_supabaseAuth'
 import { requireAuthenticatedUser } from './_supabaseAuth'
+import { getSupabaseAdminClient } from './_supabaseAdmin'
 
-interface Env {
-  SUPABASE_URL?: string
-  SUPABASE_PUBLISHABLE_KEY?: string
-  SUPABASE_ANON_KEY?: string
-  SUPABASE_SERVICE_ROLE_KEY?: string
-}
+interface Env extends DailyStylistEnv, SupabaseAuthEnv {}
 
 interface PagesContext {
   request: Request
@@ -34,8 +35,8 @@ const formatAdminError = (
   }
 
   return isKoreanLocale(preferredLocale)
-    ? `${fallbackKo} 상세: ${normalizedDetail}`
-    : `${fallbackEn} Details: ${normalizedDetail}`
+    ? fallbackKo + ' 상세: ' + normalizedDetail
+    : fallbackEn + ' Details: ' + normalizedDetail
 }
 
 export async function onRequestPost(context: PagesContext) {
@@ -60,10 +61,9 @@ export async function onRequestPost(context: PagesContext) {
     return authenticatedUser
   }
 
-  const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim()
-  const supabaseUrl = env.SUPABASE_URL?.trim()
+  const adminClient = getSupabaseAdminClient(env)
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!adminClient) {
     return jsonResponse(
       {
         error: isKoreanLocale(preferredLocale)
@@ -74,18 +74,13 @@ export async function onRequestPost(context: PagesContext) {
     )
   }
 
-  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
-
   const { data: existingUser, error: lookupError } =
     await adminClient.auth.admin.getUserById(authenticatedUser.id)
 
   if (lookupError || !existingUser.user) {
-    const detail = lookupError?.message || 'Signed-in user was not found in the configured Supabase project.'
+    const detail =
+      lookupError?.message ||
+      'Signed-in user was not found in the configured Supabase project.'
     console.error('Delete account lookup failed', {
       userId: authenticatedUser.id,
       detail,
@@ -104,6 +99,30 @@ export async function onRequestPost(context: PagesContext) {
       },
       500,
     )
+  }
+
+  try {
+    const profile = await fetchCustomerStyleProfile({
+      env,
+      userId: authenticatedUser.id,
+    })
+
+    if (profile?.photo_object_key) {
+      await deleteProfilePhotoFromR2({
+        env,
+        objectKey: profile.photo_object_key,
+      }).catch((error) => {
+        console.warn('Profile photo cleanup failed during account deletion', {
+          userId: authenticatedUser.id,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      })
+    }
+  } catch (error) {
+    console.warn('Profile lookup failed during account deletion cleanup', {
+      userId: authenticatedUser.id,
+      error: error instanceof Error ? error.message : String(error),
+    })
   }
 
   const { error } = await adminClient.auth.admin.deleteUser(

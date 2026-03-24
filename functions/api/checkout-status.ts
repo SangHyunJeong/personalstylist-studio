@@ -1,4 +1,14 @@
 import { requireAuthenticatedUser } from './_supabaseAuth'
+import {
+  deriveBillingAccessFromCustomerState,
+  extractPolarErrorMessage,
+  fetchPolarCustomerStateByExternalId,
+  getBaseApiUrl,
+  parsePolarJson,
+  POLAR_SUBSCRIPTION_PRODUCT_ID,
+  type PolarApiErrorResponse,
+  type PolarCustomerStateResponse,
+} from './_polarBilling'
 
 interface Env {
   POLAR_ACCESS_TOKEN?: string
@@ -30,11 +40,6 @@ const jsonResponse = (
 
 const isKoreanLocale = (preferredLocale?: string) =>
   preferredLocale?.toLowerCase().startsWith('ko') ?? false
-
-const getBaseApiUrl = (server?: string) =>
-  server === 'sandbox'
-    ? 'https://sandbox-api.polar.sh'
-    : 'https://api.polar.sh'
 
 export async function onRequestGet(context: PagesContext) {
   const { request, env } = context
@@ -80,10 +85,7 @@ export async function onRequestGet(context: PagesContext) {
     },
   )
 
-  const rawText = await polarResponse.text()
-  const polarJson = rawText.trim()
-    ? (JSON.parse(rawText) as PolarCheckoutStatusResponse)
-    : null
+  const polarJson = await parsePolarJson<PolarCheckoutStatusResponse>(polarResponse)
 
   if (!polarResponse.ok || !polarJson?.status) {
     return jsonResponse(
@@ -113,10 +115,52 @@ export async function onRequestGet(context: PagesContext) {
     )
   }
 
+  let hasAccess = false
+  let subscriptionStatus: 'inactive' | 'trialing' | 'active' = 'inactive'
+  let customerEmail = polarJson.customer_email ?? authenticatedUser.email ?? ''
+
+  if (polarJson.status === 'succeeded') {
+    const customerState = await fetchPolarCustomerStateByExternalId({
+      env,
+      externalCustomerId: authenticatedUser.id,
+    })
+
+    if (customerState.response.status === 404) {
+      hasAccess = false
+      subscriptionStatus = 'inactive'
+    } else if (!customerState.response.ok) {
+      const errorMessage = extractPolarErrorMessage(
+        customerState.json as PolarApiErrorResponse | null,
+      )
+
+      return jsonResponse(
+        {
+          error:
+            errorMessage ||
+            (isKoreanLocale(preferredLocale)
+              ? 'Polar 구독 상태를 확인하지 못했습니다.'
+              : 'Unable to verify the Polar subscription state.'),
+        },
+        customerState.response.status || 500,
+      )
+    } else {
+      const accessSnapshot = deriveBillingAccessFromCustomerState({
+        state: customerState.json as PolarCustomerStateResponse | null,
+        fallbackEmail: customerEmail,
+      })
+
+      hasAccess = accessSnapshot.hasAccess
+      subscriptionStatus = accessSnapshot.subscriptionStatus
+      customerEmail = accessSnapshot.customerEmail || customerEmail
+    }
+  }
+
   return Response.json({
     status: polarJson.status,
-    productId: polarJson.product_id ?? '',
+    productId: polarJson.product_id ?? POLAR_SUBSCRIPTION_PRODUCT_ID,
     orderId: polarJson.order_id ?? '',
-    customerEmail: polarJson.customer_email ?? '',
+    customerEmail,
+    hasAccess,
+    subscriptionStatus,
   })
 }

@@ -1,11 +1,8 @@
+import { runDailyStyleScheduler, type DailyStylistEnv } from './functions/api/_dailyStylist'
 import { onRequestPost as handleHairPost } from './functions/api/hairstyle-grid'
 import { onRequestPost as handleStylePost } from './functions/api/style-report'
 
-type Env = {
-  GEMINI_API_KEY?: string
-  POLAR_ACCESS_TOKEN?: string
-  POLAR_SERVER?: string
-}
+type Env = DailyStylistEnv
 
 type WorkerContext = {
   request: Request
@@ -43,15 +40,17 @@ const logResult = async ({
       return
     }
 
-    console.log(JSON.stringify({
-      path,
-      status: response.status,
-      colo: request.cf?.colo ?? 'unknown',
-      country: request.cf?.country ?? 'unknown',
-      city: request.cf?.city ?? 'unknown',
-      note: body.note ?? '',
-      error: body.error ?? '',
-    }))
+    console.log(
+      JSON.stringify({
+        path,
+        status: response.status,
+        colo: request.cf?.colo ?? 'unknown',
+        country: request.cf?.country ?? 'unknown',
+        city: request.cf?.city ?? 'unknown',
+        note: body.note ?? '',
+        error: body.error ?? '',
+      }),
+    )
   } catch {
     // Ignore log parsing failures so the API response stays unaffected.
   }
@@ -102,5 +101,21 @@ export default {
     }
 
     return jsonResponse({ error: 'Not found.' }, 404)
+  },
+
+  scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(
+      (async () => {
+        const summary = await runDailyStyleScheduler({ env })
+        console.log(
+          JSON.stringify({
+            type: 'daily-style-scheduler',
+            cron: controller.cron,
+            scheduledTime: new Date(controller.scheduledTime).toISOString(),
+            ...summary,
+          }),
+        )
+      })(),
+    )
   },
 }

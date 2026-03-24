@@ -1,4 +1,5 @@
 import { Webhook } from 'standardwebhooks'
+import { POLAR_SUBSCRIPTION_PRODUCT_ID, getBaseApiUrl } from './_polarBilling'
 
 interface Env {
   POLAR_ACCESS_TOKEN?: string
@@ -36,28 +37,23 @@ type PolarErrorResponse = {
   }
 }
 
-const PRODUCT_ID = '82fb5b93-ef0a-4af0-914c-05aaf8882da2'
 
 const jsonResponse = (
   body: Record<string, string>,
   status: number,
 ) => Response.json(body, { status })
 
-const getBaseApiUrl = (server?: string) =>
-  server === 'sandbox'
-    ? 'https://sandbox-api.polar.sh'
-    : 'https://api.polar.sh'
 
 const getOrderId = (payload: PolarWebhookPayload) =>
   payload.data?.order_id ?? payload.data?.id ?? ''
 
 const includesTargetProduct = (payload: PolarWebhookPayload) => {
-  if (payload.data?.product_id === PRODUCT_ID) {
+  if (payload.data?.product_id === POLAR_SUBSCRIPTION_PRODUCT_ID) {
     return true
   }
 
   return payload.data?.items?.some((item) =>
-    item.product_id === PRODUCT_ID || item.product?.id === PRODUCT_ID,
+    item.product_id === POLAR_SUBSCRIPTION_PRODUCT_ID || item.product?.id === POLAR_SUBSCRIPTION_PRODUCT_ID,
   ) ?? false
 }
 

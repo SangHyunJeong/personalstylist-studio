@@ -9,3 +9,6 @@ POLAR_SERVER=production
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
 RESEND_REPLY_TO=
+# Cloudflare R2 is not configured through .dev.vars.
+# Add an R2 binding named PROFILE_PHOTOS to both your Pages project and the API worker.
+# Example bucket name: personalstylist-profile-photos

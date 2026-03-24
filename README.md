@@ -82,6 +82,74 @@ Cloudflare Pages + Functions locally:
 npm run cf:dev
 ```
 
+## Daily Style Profile
+
+This project now stores a dedicated morning-brief profile in Supabase and delivers a daily styling email at 6:00 AM in each user's saved timezone.
+
+The new Supabase tables are created by:
+
+- `supabase/migrations/202603241430_daily_style_profiles.sql`
+
+Fields stored per user:
+
+- height and weight
+- resolved location and timezone
+- reference photo metadata
+- daily email toggle
+- last local delivery date and delivery logs
+
+Apply the migration locally with the Supabase CLI after `supabase start`:
+
+```bash
+npx supabase migration up
+```
+
+If you are pointing at a hosted Supabase project, run your normal SQL/migration deployment flow there as well.
+
+## R2 Photo Storage
+
+Profile photos are stored in Cloudflare R2 and read back through authenticated API routes:
+
+- `/api/customer-profile`
+- `/api/customer-profile-photo`
+
+Required binding name:
+
+- `PROFILE_PHOTOS`
+
+Configure the same binding in both places:
+
+- Cloudflare Pages project for the Pages Functions routes
+- the separate API worker defined by `wrangler.api.toml`
+
+Example bucket name:
+
+- `personalstylist-profile-photos`
+
+## Daily Scheduler
+
+The separate API worker now includes a cron trigger:
+
+- `*/15 * * * *`
+
+The worker checks saved profiles every 15 minutes and only sends the daily brief when the user's saved timezone is at local 6:00 AM and the user still has an active Polar free trial or subscription.
+
+Daily delivery requires these server-side integrations:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `POLAR_ACCESS_TOKEN`
+- `GEMINI_API_KEY`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `PROFILE_PHOTOS` R2 binding
+
+Deploy the cron worker after updating the binding and secrets:
+
+```bash
+source .dev.vars
+npx wrangler deploy --config wrangler.api.toml
+```
+
 ## Auth Flow
 
 - The browser uses `@supabase/supabase-js` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` by default, with `VITE_SUPABASE_ANON_KEY` as a local fallback.

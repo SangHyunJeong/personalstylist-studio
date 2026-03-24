@@ -1,3 +1,7 @@
 name = "personalstylist-studio"
 compatibility_date = "2026-03-09"
 pages_build_output_dir = "dist"
+
+[[r2_buckets]]
+binding = "PROFILE_PHOTOS"
+bucket_name = "personalstylist-profile-photos"

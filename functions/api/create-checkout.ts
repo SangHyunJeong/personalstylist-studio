@@ -1,4 +1,5 @@
 import { requireAuthenticatedUser } from './_supabaseAuth'
+import { POLAR_SUBSCRIPTION_PRODUCT_ID, getBaseApiUrl } from './_polarBilling'
 
 interface Env {
   POLAR_ACCESS_TOKEN?: string
@@ -20,8 +21,6 @@ type PolarCheckoutResponse = {
   }
 }
 
-const PRODUCT_ID = '82fb5b93-ef0a-4af0-914c-05aaf8882da2'
-
 const jsonResponse = (
   body: Record<string, string>,
   status: number,
@@ -29,11 +28,6 @@ const jsonResponse = (
 
 const isKoreanLocale = (preferredLocale?: string) =>
   preferredLocale?.toLowerCase().startsWith('ko') ?? false
-
-const getBaseApiUrl = (server?: string) =>
-  server === 'sandbox'
-    ? 'https://sandbox-api.polar.sh'
-    : 'https://api.polar.sh'
 
 export async function onRequestPost(context: PagesContext) {
   const { request, env } = context
@@ -100,18 +94,19 @@ export async function onRequestPost(context: PagesContext) {
   successUrl.searchParams.set('checkout', 'success')
   successUrl.searchParams.set('checkout_id', '{CHECKOUT_ID}')
 
-  const apiUrl = `${getBaseApiUrl(env.POLAR_SERVER)}/v1/checkouts/`
-  const polarResponse = await fetch(apiUrl, {
+  const polarResponse = await fetch(`${getBaseApiUrl(env.POLAR_SERVER)}/v1/checkouts/`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      products: [PRODUCT_ID],
+      products: [POLAR_SUBSCRIPTION_PRODUCT_ID],
       customer_email: authenticatedUser.email,
+      external_customer_id: authenticatedUser.id,
       metadata: {
         supabase_user_id: authenticatedUser.id,
+        checkout_kind: 'subscription',
       },
       success_url: successUrl.toString(),
       return_url: returnUrl.toString(),
@@ -130,8 +125,8 @@ export async function onRequestPost(context: PagesContext) {
         error:
           polarJson?.error?.message ??
           (isKoreanLocale(preferredLocale)
-            ? 'Polar 결제 세션을 생성하지 못했습니다.'
-            : 'Unable to create the Polar checkout session.'),
+            ? 'Polar 구독 체크아웃 세션을 생성하지 못했습니다.'
+            : 'Unable to create the Polar subscription checkout session.'),
       },
       polarResponse.status || 500,
     )
