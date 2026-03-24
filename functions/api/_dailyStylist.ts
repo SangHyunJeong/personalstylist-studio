@@ -4,8 +4,9 @@ import {
   type PolarEnv,
 } from './_polarBilling'
 import { getSupabaseAdminClient, type SupabaseAdminEnv } from './_supabaseAdmin'
+import type { SupabaseAuthEnv } from './_supabaseAuth'
 
-export interface DailyStylistEnv extends SupabaseAdminEnv, PolarEnv {
+export interface DailyStylistEnv extends SupabaseAdminEnv, PolarEnv, SupabaseAuthEnv {
   GEMINI_API_KEY?: string
   RESEND_API_KEY?: string
   RESEND_FROM_EMAIL?: string
@@ -159,6 +160,19 @@ const normalizeBoolean = (value: FormDataEntryValue | null) => {
   }
 
   return value === 'true' || value === '1' || value === 'on'
+}
+
+const isValidTimeZone = (value: string) => {
+  if (!value.trim()) {
+    return false
+  }
+
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date())
+    return true
+  } catch {
+    return false
+  }
 }
 
 const toBase64 = (buffer: ArrayBuffer) => {
@@ -878,6 +892,11 @@ export const saveCustomerStyleProfile = async ({
   const heightCm = parseNumber(formData.get('heightCm'))
   const weightKg = parseNumber(formData.get('weightKg'))
   const locationQuery = String(formData.get('locationQuery') ?? '').trim()
+  const directLocationName = String(formData.get('locationName') ?? '').trim()
+  const directCountryCode = String(formData.get('countryCode') ?? '').trim()
+  const directTimezone = String(formData.get('timezone') ?? '').trim()
+  const directLatitude = parseNumber(formData.get('latitude'))
+  const directLongitude = parseNumber(formData.get('longitude'))
   const dailyEmailEnabled = normalizeBoolean(formData.get('dailyEmailEnabled'))
   const localeValue = String(formData.get('preferredLocale') ?? preferredLocale ?? 'en-US').trim() || 'en-US'
   const uploadedPhoto = formData.get('photo')
@@ -898,10 +917,34 @@ export const saveCustomerStyleProfile = async ({
     )
   }
 
-  const resolvedLocation = await resolveLocationQuery({
-    query: locationQuery,
-    preferredLocale,
-  })
+  const hasDirectLocation =
+    typeof directLatitude === 'number' &&
+    typeof directLongitude === 'number' &&
+    directLatitude >= -90 &&
+    directLatitude <= 90 &&
+    directLongitude >= -180 &&
+    directLongitude <= 180 &&
+    isValidTimeZone(directTimezone)
+
+  const resolvedLocation = hasDirectLocation
+    ? {
+        locationQuery:
+          locationQuery ||
+          directLocationName ||
+          (isKoreanLocale(preferredLocale) ? '현재 위치' : 'Current location'),
+        locationName:
+          directLocationName ||
+          locationQuery ||
+          (isKoreanLocale(preferredLocale) ? '현재 위치' : 'Current location'),
+        countryCode: directCountryCode || currentProfile?.country_code || '',
+        latitude: Number(directLatitude.toFixed(6)),
+        longitude: Number(directLongitude.toFixed(6)),
+        timezone: directTimezone,
+      }
+    : await resolveLocationQuery({
+        query: locationQuery,
+        preferredLocale,
+      })
 
   let photoObjectKey = currentProfile?.photo_object_key ?? null
   let photoContentType = currentProfile?.photo_content_type ?? null

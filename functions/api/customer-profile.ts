@@ -18,6 +18,8 @@ type SerializedCustomerProfile = {
   locationName: string
   countryCode: string | null
   timezone: string
+  latitude: number
+  longitude: number
   dailyEmailEnabled: boolean
   preferredLocale: string
   hasPhoto: boolean
@@ -51,6 +53,8 @@ const serializeProfile = (
     locationName: profile.location_name,
     countryCode: profile.country_code,
     timezone: profile.timezone,
+    latitude: profile.latitude,
+    longitude: profile.longitude,
     dailyEmailEnabled: profile.daily_email_enabled,
     preferredLocale: profile.preferred_locale,
     hasPhoto: Boolean(profile.photo_object_key),

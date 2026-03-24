@@ -75,6 +75,8 @@ type CustomerProfileRecord = {
   locationName: string
   countryCode?: string | null
   timezone: string
+  latitude?: number | null
+  longitude?: number | null
   dailyEmailEnabled: boolean
   preferredLocale: string
   hasPhoto: boolean
@@ -480,6 +482,17 @@ const localeCopy = {
     accountProfileWeightLabel: '몸무게 (kg)',
     accountProfileLocationLabel: '도시 또는 지역',
     accountProfileLocationPlaceholder: '예: Seoul, South Korea',
+    accountProfileLocationAutoAction: '현재 위치로 자동 입력',
+    accountProfileLocationAutoLoading: '현재 위치 확인 중...',
+    accountProfileLocationAutoSuccess:
+      '현재 위치를 불러왔습니다. 저장하면 이 위치 기준으로 오전 6시 브리프가 발송됩니다.',
+    accountProfileLocationAutoUnsupported:
+      '이 브라우저에서는 현재 위치 자동 감지를 지원하지 않습니다.',
+    accountProfileLocationAutoDenied:
+      '현재 위치 권한이 거부되었습니다. 브라우저 설정에서 위치 권한을 허용해 주세요.',
+    accountProfileLocationAutoFailed:
+      '현재 위치를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
+    accountProfileCurrentLocation: '현재 위치',
     accountProfileResolvedLocationLabel: '저장된 위치',
     accountProfileTimezoneLabel: '시간대',
     accountProfileScheduleLabel: '일일 발송 일정',
@@ -723,6 +736,17 @@ const localeCopy = {
     accountProfileWeightLabel: 'Weight (kg)',
     accountProfileLocationLabel: 'City or region',
     accountProfileLocationPlaceholder: 'e.g. Seoul, South Korea',
+    accountProfileLocationAutoAction: 'Use current location',
+    accountProfileLocationAutoLoading: 'Detecting your location...',
+    accountProfileLocationAutoSuccess:
+      'Your current location was loaded. Save the profile to schedule the 6:00 AM brief for this location.',
+    accountProfileLocationAutoUnsupported:
+      'This browser does not support automatic current-location detection.',
+    accountProfileLocationAutoDenied:
+      'Location access was denied. Please allow location access in your browser settings.',
+    accountProfileLocationAutoFailed:
+      'Unable to detect your current location right now. Please try again shortly.',
+    accountProfileCurrentLocation: 'Current location',
     accountProfileResolvedLocationLabel: 'Saved location',
     accountProfileTimezoneLabel: 'Timezone',
     accountProfileScheduleLabel: 'Daily delivery schedule',
@@ -1096,6 +1120,9 @@ function App() {
   const [customerProfileLocationQuery, setCustomerProfileLocationQuery] = useState('')
   const [customerProfileLocationName, setCustomerProfileLocationName] = useState('')
   const [customerProfileTimezone, setCustomerProfileTimezone] = useState('')
+  const [customerProfileLatitude, setCustomerProfileLatitude] = useState<number | null>(null)
+  const [customerProfileLongitude, setCustomerProfileLongitude] = useState<number | null>(null)
+  const [isLocationDetecting, setIsLocationDetecting] = useState(false)
   const [customerProfileHasPhoto, setCustomerProfileHasPhoto] = useState(false)
   const [customerProfilePhotoFile, setCustomerProfilePhotoFile] = useState<File | null>(null)
   const [customerProfilePhotoName, setCustomerProfilePhotoName] = useState<string>(localeCopy.en.noImageSelected)
@@ -1243,6 +1270,9 @@ function App() {
     setCustomerProfileLocationQuery('')
     setCustomerProfileLocationName('')
     setCustomerProfileTimezone('')
+    setCustomerProfileLatitude(null)
+    setCustomerProfileLongitude(null)
+    setIsLocationDetecting(false)
     setCustomerProfileHasPhoto(false)
     setCustomerProfilePhotoFile(null)
     setCustomerProfilePhotoName(copy.noImageSelected)
@@ -2014,6 +2044,8 @@ function App() {
       setCustomerProfileLocationQuery(profile?.locationQuery ?? '')
       setCustomerProfileLocationName(profile?.locationName ?? '')
       setCustomerProfileTimezone(profile?.timezone ?? '')
+      setCustomerProfileLatitude(profile?.latitude ?? null)
+      setCustomerProfileLongitude(profile?.longitude ?? null)
       setCustomerProfileHasPhoto(Boolean(profile?.hasPhoto))
       setCustomerProfilePhotoFile(null)
       setCustomerProfilePhotoName(
@@ -2097,6 +2129,71 @@ function App() {
     ],
   )
 
+  const handleCustomerProfileLocationQueryChange = (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const nextValue = event.target.value
+    setCustomerProfileLocationQuery(nextValue)
+    setCustomerProfileLocationName('')
+    setCustomerProfileTimezone('')
+    setCustomerProfileLatitude(null)
+    setCustomerProfileLongitude(null)
+    setCustomerProfileMessage('')
+  }
+
+  const handleUseCurrentLocation = async () => {
+    if (typeof window === 'undefined' || !('geolocation' in navigator)) {
+      setCustomerProfileFeedback('error', copy.accountProfileLocationAutoUnsupported)
+      return
+    }
+
+    const browserTimeZone =
+      Intl.DateTimeFormat().resolvedOptions().timeZone?.trim() || ''
+
+    if (!browserTimeZone) {
+      setCustomerProfileFeedback('error', copy.accountProfileLocationAutoFailed)
+      return
+    }
+
+    try {
+      setIsLocationDetecting(true)
+      setCustomerProfileMessage('')
+
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          timeout: 12000,
+          maximumAge: 300000,
+        })
+      })
+
+      const latitude = Number(position.coords.latitude.toFixed(6))
+      const longitude = Number(position.coords.longitude.toFixed(6))
+      const currentLocationLabel = copy.accountProfileCurrentLocation
+
+      setCustomerProfileLatitude(latitude)
+      setCustomerProfileLongitude(longitude)
+      setCustomerProfileTimezone(browserTimeZone)
+      setCustomerProfileLocationName(currentLocationLabel)
+      setCustomerProfileLocationQuery(currentLocationLabel)
+      setCustomerProfileFeedback('success', copy.accountProfileLocationAutoSuccess)
+    } catch (error) {
+      const errorCode =
+        typeof error === 'object' && error && 'code' in error
+          ? Number((error as { code?: unknown }).code)
+          : 0
+
+      setCustomerProfileFeedback(
+        'error',
+        errorCode === 1
+          ? copy.accountProfileLocationAutoDenied
+          : copy.accountProfileLocationAutoFailed,
+      )
+    } finally {
+      setIsLocationDetecting(false)
+    }
+  }
+
   const handleCustomerProfilePhotoChange = (
     event: ChangeEvent<HTMLInputElement>,
   ) => {
@@ -2143,6 +2240,22 @@ function App() {
         customerDailyEmailEnabled ? 'true' : 'false',
       )
       formData.set('preferredLocale', preferredLocale)
+
+      if (
+        typeof customerProfileLatitude === 'number' &&
+        typeof customerProfileLongitude === 'number' &&
+        customerProfileTimezone.trim()
+      ) {
+        formData.set('latitude', String(customerProfileLatitude))
+        formData.set('longitude', String(customerProfileLongitude))
+        formData.set('timezone', customerProfileTimezone.trim())
+        formData.set(
+          'locationName',
+          customerProfileLocationName.trim() ||
+            customerProfileLocationQuery.trim() ||
+            copy.accountProfileCurrentLocation,
+        )
+      }
 
       if (customerProfilePhotoFile) {
         const uploadFile = await compressImageForUpload(customerProfilePhotoFile)
@@ -3625,13 +3738,27 @@ function App() {
                     <div className="auth-input-wrap">
                       <input
                         autoComplete="address-level2"
-                        onChange={(event) => setCustomerProfileLocationQuery(event.target.value)}
+                        onChange={handleCustomerProfileLocationQueryChange}
                         placeholder={copy.accountProfileLocationPlaceholder}
                         type="text"
                         value={customerProfileLocationQuery}
                       />
                     </div>
                   </label>
+                  <div className="auth-action-row">
+                    <button
+                      className="utility-button"
+                      disabled={isLocationDetecting || isCustomerProfileLoading || isCustomerProfileSaving}
+                      onClick={() => {
+                        void handleUseCurrentLocation()
+                      }}
+                      type="button"
+                    >
+                      {isLocationDetecting
+                        ? copy.accountProfileLocationAutoLoading
+                        : copy.accountProfileLocationAutoAction}
+                    </button>
+                  </div>
                   <div className="account-info-grid">
                     <p className="delivery-target">
                       <strong>{copy.accountProfileResolvedLocationLabel}</strong>
