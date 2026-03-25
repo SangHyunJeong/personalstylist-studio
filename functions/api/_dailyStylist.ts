@@ -575,17 +575,21 @@ const buildDailyBriefPrompt = ({
   weather: DailyWeatherSnapshot
   localDate: string
 }) => [
-  'You are Personal AI Stylist, an automated digital styling assistant.',
-  'Use the user\'s saved reference photo, body metrics, location, and weather to create one concise morning outfit brief for today.',
+  'You are Personal AI Stylist, a professional image consultant preparing one concise daily outfit brief.',
+  'Use the user's saved reference photo, body metrics, saved location, and today's weather to recommend one practical look for today.',
   'If the locale starts with ko, write in Korean. Otherwise, write in English.',
-  'Use markdown-style headings and short bullets.',
-  'Avoid unsupported claims. Only use the weather facts provided.',
-  'Use this exact structure:',
-  '### Today\'s weather fit',
-  '### Outfit formula',
-  '### Styling note',
-  '### Avoid today',
-  '### Why this works today',
+  'Use markdown headings beginning with ### and bullet lines beginning with *.',
+  'Keep the tone professional, decisive, and compact.',
+  'Use this decision order: weather practicality -> color direction near the face -> proportion and silhouette -> style essence consistency.',
+  'Only use the provided weather facts. Base style inference on the saved reference photo and body metrics without claiming certainty where evidence is limited.',
+  'Keep the section order exactly as follows, but localize the section titles into the user language:',
+  '### Today's Style Thesis',
+  '### Weather and Fabric Strategy',
+  '### Proportion Formula',
+  '### Color and V-Zone Note',
+  '### Shoes and Accessories',
+  '### Avoid Today',
+  '### Why This Works Today',
   'Local delivery date: ' + localDate,
   'Preferred locale: ' + profile.preferred_locale,
   'Saved location: ' + profile.location_name,
@@ -604,18 +608,17 @@ const buildDailyLookPrompt = ({
   weather: DailyWeatherSnapshot
   brief: string
 }) => [
-  'You are Personal AI Stylist, creating a single photorealistic daily outfit visualization.',
-  'Use the attached reference photo of the same person.',
+  'You are Personal AI Stylist, creating one photorealistic daily outfit visualization for the exact same person in the reference photo.',
   'Keep the exact same face, identity, skin tone, body proportions, and overall facial features.',
-  'Do not change the person. Restyle only the outfit, accessories, styling details, and the pose if needed.',
-  'Generate one polished editorial-quality image that matches today\'s weather and the styling brief below.',
-  'Favor a flattering full-body or 3/4 portrait with realistic fabric detail, wearable layering, and coherent accessories.',
-  'The result must feel like the same person actually wearing the recommended outfit today.',
-  'Avoid collage layouts, text overlays, split screens, or before/after compositions.',
+  'Do not change the person. Change only the clothing, accessories, styling details, and pose if needed.',
+  'Translate the daily brief below into one realistic, weather-appropriate outfit that respects the recommended color direction, neckline or V-zone logic, proportion formula, and style essence.',
+  'Create a polished full-body or 3/4 portrait with realistic fabric behavior, practical layering, and believable accessories for the stated weather.',
+  'The result should feel wearable today in the saved location, not like a fantasy editorial costume.',
+  'Avoid collage layouts, text overlays, split screens, duplicate figures, or beauty edits that alter identity.',
   'Preferred locale: ' + profile.preferred_locale,
   'Saved location: ' + profile.location_name,
   'Body reference: ' + profile.height_cm + ' cm, ' + profile.weight_kg + ' kg.',
-  'Today\'s weather: ' + weather.summary,
+  'Today's weather: ' + weather.summary,
   'Follow this daily styling brief closely:',
   brief,
 ].join('\n\n')
@@ -650,60 +653,80 @@ const buildFallbackDailyBrief = ({
 
   if (ko) {
     return [
-      "### Today's weather fit" ,
+      '### Today's Style Thesis',
+      '* 오늘 추천은 날씨 대응력과 비율 정리를 동시에 잡는 실용적 스타일에 초점을 둡니다.',
       '* ' + weather.summary,
+      '',
+      '### Weather and Fabric Strategy',
       warm
-        ? '* 통기성이 좋은 상의와 가벼운 하의 조합으로 체온 상승을 막아 주세요.'
+        ? '* 통기성이 좋은 상의와 가벼운 하의를 중심으로 열감이 갇히지 않게 구성하세요.'
         : cold
-          ? '* 아침과 저녁 온도차를 고려해 얇은 아우터 또는 니트 레이어를 준비하세요.'
-          : '* 실내외 온도차에 대응할 수 있는 가벼운 레이어링을 유지하세요.',
-      '',
-      '### Outfit formula',
+          ? '* 아침과 저녁의 냉기를 고려해 얇은 니트나 가벼운 아우터를 추가하는 편이 좋습니다.'
+          : '* 실내외 온도차를 고려해 쉽게 벗고 입을 수 있는 얇은 레이어를 유지하세요.',
       rainy
-        ? '* 상의는 정돈된 기본 톱, 하의는 활동성 있는 팬츠, 겉옷은 생활 방수 가능한 가벼운 아우터 조합을 추천합니다.'
-        : '* 상의는 깔끔한 기본 톱, 하의는 실루엣이 정리되는 팬츠나 스커트, 바깥 레이어는 얇은 재킷 또는 가디건 조합이 좋습니다.',
-      '* 신발은 오래 걸어도 부담이 적고 오늘 날씨에 맞는 소재를 우선하세요.',
+        ? '* 생활 방수 가능한 겉옷이나 젖어도 부담이 적은 소재를 우선하세요.'
+        : '* 매트하고 구조가 조금 살아 있는 소재가 전체 실루엣을 더 정돈되게 보이게 합니다.',
       '',
-      '### Styling note',
-      '* 얼굴 주변은 과한 장식보다 톤이 정리된 컬러 포인트 하나로 마무리하는 편이 안정적입니다.',
-      '* 기준 사진의 전체 비율을 살리려면 허리선이나 세로 라인이 보이는 실루엣이 유리합니다.',
-      '',
-      '### Avoid today',
+      '### Proportion Formula',
+      '* 허리선이 보이거나 상하의 명도 차가 과하지 않은 조합이 오늘 비율을 가장 안정적으로 보이게 합니다.',
       rainy
-        ? '* 비와 습기에 약한 무거운 소재나 바닥에 끌리는 긴 기장은 피하는 편이 좋습니다.'
-        : '* 체형 비율을 애매하게 끊는 중간 길이 상의와 과한 오버핏 중첩은 피하세요.',
+        ? '* 바닥에 끌리는 긴 기장보다 활동성 있는 길이와 정돈된 하의 라인이 유리합니다.'
+        : '* 중간 길이 상의보다 재킷, 셔츠, 니트의 끝선이 명확한 구성이 실루엣을 더 깔끔하게 만듭니다.',
       '',
-      '### Why this works today',
-      '* 현재는 AI 생성 한도 이슈가 있어 예비 브리프를 발송했지만, 오늘 날씨와 저장된 체형 정보 기준으로 아침 준비 시간을 줄이는 데 초점을 맞췄습니다.',
+      '### Color and V-Zone Note',
+      '* 얼굴 주변은 과한 패턴보다 안정적인 베이스 컬러 한두 가지로 정리하고, 네크라인은 답답하지 않게 여백을 확보하세요.',
+      '* 액세서리는 한 가지 포인트만 두고 시선을 분산시키는 요소는 줄이는 편이 좋습니다.',
+      '',
+      '### Shoes and Accessories',
+      '* 신발은 오래 걸어도 무리가 없고 오늘 노면 상태에 맞는 소재를 우선하세요.',
+      '* 가방과 벨트는 선이 단정한 디자인을 고르면 전체 착장이 더 정리되어 보입니다.',
+      '',
+      '### Avoid Today',
+      rainy
+        ? '* 비와 습기에 약한 무거운 소재, 젖으면 형태가 무너지는 바지 밑단, 관리가 까다로운 스웨이드는 피하세요.'
+        : '* 체형 비율을 애매하게 끊는 중간 길이 상의와 과도한 오버핏 중첩은 피하세요.',
+      '',
+      '### Why This Works Today',
+      '* 현재는 AI 생성 한도 이슈로 예비 브리프를 사용했지만, 오늘 날씨와 저장된 체형 정보 기준으로 준비 시간이 짧고 실패 확률이 낮은 조합을 우선했습니다.',
     ].join('\n')
   }
 
   return [
-    "### Today's weather fit" ,
+    '### Today's Style Thesis',
+    '* Today's recommendation prioritizes practical weather response while keeping the body line clean and intentional.',
     '* ' + weather.summary,
+    '',
+    '### Weather and Fabric Strategy',
     warm
       ? '* Keep the base outfit breathable and light so the look stays polished without trapping heat.'
       : cold
-        ? '* Plan for a knit or light outer layer so the outfit stays balanced across the cooler parts of the day.'
-        : '* A light layer will help you stay comfortable through indoor and outdoor temperature changes.',
-    '',
-    '### Outfit formula',
+        ? '* Add a knit or light outer layer so the outfit stays balanced during the cooler parts of the day.'
+        : '* Use an easy light layer that can move between indoor and outdoor temperatures without bulk.',
     rainy
-      ? '* Start with a clean base top, add practical bottoms, and finish with a light outer layer that can handle damp conditions.'
-      : '* Start with a clean base top, use bottoms with a defined line, and finish with a light jacket or cardigan.',
+      ? '* Favor practical outer layers or materials that can handle damp conditions without looking sloppy.'
+      : '* Slightly structured matte fabrics will usually keep the silhouette cleaner than soft bulky texture.',
+    '',
+    '### Proportion Formula',
+    '* A visible waist point or a smaller value break between top and bottom will usually read as the most balanced proportion today.',
+    rainy
+      ? '* Choose active lengths and a controlled lower silhouette instead of hems that drag or collapse in wet conditions.'
+      : '* Clear hem endings on jackets, shirts, or knitwear usually look sharper than tops that stop at an awkward middle point.',
+    '',
+    '### Color and V-Zone Note',
+    '* Keep the face zone clean with one or two stable base colors instead of busy pattern or loud contrast.',
+    '* Let one accessory do the work and keep the neckline visually open enough to avoid a heavy upper frame.',
+    '',
+    '### Shoes and Accessories',
     '* Choose shoes that stay comfortable through the day and suit the ground conditions.',
+    '* A bag or belt with a clean line will help the total outfit feel more resolved.',
     '',
-    '### Styling note',
-    '* Keep the face area clean and let one controlled color or accessory do the work instead of adding too many details.',
-    '* A visible waist line or vertical structure will usually read best with the proportions in the saved reference photo.',
-    '',
-    '### Avoid today',
+    '### Avoid Today',
     rainy
-      ? '* Avoid heavy fabrics or long hems that become awkward in wet conditions.'
+      ? '* Avoid heavy fabrics, delicate suede, or long hems that become awkward in wet conditions.'
       : '* Avoid mid-length tops that cut the proportions unclearly and oversized layering that makes the shape look heavy.',
     '',
-    '### Why this works today',
-    '* The AI generation limit was hit, so this fallback brief focuses on weather fit and proportion-friendly choices you can use right away this morning.',
+    '### Why This Works Today',
+    '* The AI generation limit was hit, so this fallback brief favors low-risk combinations that still align weather practicality with proportion-friendly styling.',
   ].join('\n')
 };
 
