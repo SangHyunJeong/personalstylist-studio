@@ -576,14 +576,14 @@ const buildDailyBriefPrompt = ({
   localDate: string
 }) => [
   'You are Personal AI Stylist, a professional image consultant preparing one concise daily outfit brief.',
-  'Use the user's saved reference photo, body metrics, saved location, and today's weather to recommend one practical look for today.',
+  "Use the user's saved reference photo, body metrics, saved location, and today's weather to recommend one practical look for today.",
   'If the locale starts with ko, write in Korean. Otherwise, write in English.',
   'Use markdown headings beginning with ### and bullet lines beginning with *.',
   'Keep the tone professional, decisive, and compact.',
   'Use this decision order: weather practicality -> color direction near the face -> proportion and silhouette -> style essence consistency.',
   'Only use the provided weather facts. Base style inference on the saved reference photo and body metrics without claiming certainty where evidence is limited.',
   'Keep the section order exactly as follows, but localize the section titles into the user language:',
-  '### Today's Style Thesis',
+  "### Today's Style Thesis",
   '### Weather and Fabric Strategy',
   '### Proportion Formula',
   '### Color and V-Zone Note',
@@ -618,7 +618,7 @@ const buildDailyLookPrompt = ({
   'Preferred locale: ' + profile.preferred_locale,
   'Saved location: ' + profile.location_name,
   'Body reference: ' + profile.height_cm + ' cm, ' + profile.weight_kg + ' kg.',
-  'Today's weather: ' + weather.summary,
+  "Today's weather: " + weather.summary,
   'Follow this daily styling brief closely:',
   brief,
 ].join('\n\n')
@@ -653,7 +653,7 @@ const buildFallbackDailyBrief = ({
 
   if (ko) {
     return [
-      '### Today's Style Thesis',
+      "### Today's Style Thesis",
       '* 오늘 추천은 날씨 대응력과 비율 정리를 동시에 잡는 실용적 스타일에 초점을 둡니다.',
       '* ' + weather.summary,
       '',
@@ -692,8 +692,8 @@ const buildFallbackDailyBrief = ({
   }
 
   return [
-    '### Today's Style Thesis',
-    '* Today's recommendation prioritizes practical weather response while keeping the body line clean and intentional.',
+    "### Today's Style Thesis",
+    "* Today's recommendation prioritizes practical weather response while keeping the body line clean and intentional.",
     '* ' + weather.summary,
     '',
     '### Weather and Fabric Strategy',
