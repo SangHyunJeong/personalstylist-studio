@@ -10,6 +10,19 @@ import type { Session, SupabaseClient } from '@supabase/supabase-js'
 import { toBlob } from 'html-to-image'
 import { policyDocuments, type PolicyView as LegalView } from './legalContent'
 import { loadSupabaseClient } from './supabase'
+import {
+  HOME_ITEM_LIST_ID,
+  HOME_ITEM_LIST_NAME,
+  SUBSCRIPTION_PROMOTION_ID,
+  SUBSCRIPTION_PROMOTION_NAME,
+  SUBSCRIPTION_PROMOTION_SLOT,
+  buildCheckoutItem,
+  buildFeatureItem,
+  buildSubscriptionPromotionItem,
+  getHomeRecommendationItems,
+  trackEvent,
+  trackPageView,
+} from './analytics'
 import './App.css'
 
 type StyleReportResponse = {
@@ -136,6 +149,7 @@ type PendingCheckoutPayload = StyleGenerationPayload | HairGenerationPayload
 type ProtectedView = Extract<View, 'style' | 'hair'>
 type BillingAccessPhase = 'inactive' | 'trialing' | 'active'
 type CheckoutKind = 'one_time' | 'subscription'
+type CheckoutSource = ProtectedView | 'subscription'
 
 type Theme = 'light' | 'dark'
 type Language = 'ko' | 'en'
@@ -155,6 +169,7 @@ const PURCHASE_ORDER_ID_KEY = 'polar_purchase_order_id'
 const PURCHASE_EMAIL_KEY = 'polar_purchase_email'
 const PENDING_CHECKOUT_KEY = 'polar_pending_checkout_payload'
 const PENDING_ENTRY_VIEW_KEY = 'polar_pending_entry_view'
+const PENDING_CHECKOUT_SOURCE_KEY = 'polar_pending_checkout_source'
 const MAX_UPLOAD_BYTES = 1_200_000
 const MAX_UPLOAD_DIMENSION = 1600
 
@@ -1172,6 +1187,7 @@ function App() {
   const [view, setView] = useState<View>(getInitialView)
   const styleReportCaptureRef = useRef<HTMLElement | null>(null)
   const hairReportCaptureRef = useRef<HTMLElement | null>(null)
+  const lastTrackedViewRef = useRef<View | null>(null)
   const [authMode, setAuthMode] = useState<AuthMode>('sign-in')
   const [authEmail, setAuthEmail] = useState('')
   const [authPassword, setAuthPassword] = useState('')
@@ -1359,6 +1375,14 @@ function App() {
     isPurchaseVerified ||
     billingAccessPhase === 'trialing' ||
     billingAccessPhase === 'active'
+  const analyticsAccessType =
+    isPurchaseVerified
+      ? 'one_time'
+      : billingAccessPhase === 'trialing'
+        ? 'subscription_trial'
+        : billingAccessPhase === 'active'
+          ? 'subscription_active'
+          : 'locked'
 
   const setAuthFeedback = (tone: StatusTone, message: string) => {
     setAuthMessageTone(tone)
@@ -1406,8 +1430,20 @@ function App() {
   )
 
   const toggleAccountSection = useCallback((section: AccountSection) => {
+    const isOpening = openAccountSection !== section
+
+    if (section === 'subscription' && isOpening && billingAccessPhase === 'inactive') {
+      trackEvent('view_promotion', {
+        promotion_id: SUBSCRIPTION_PROMOTION_ID,
+        promotion_name: SUBSCRIPTION_PROMOTION_NAME,
+        creative_slot: SUBSCRIPTION_PROMOTION_SLOT,
+        items: [buildSubscriptionPromotionItem()],
+        ui_locale: preferredLocale,
+      })
+    }
+
     setOpenAccountSection((current) => (current === section ? null : section))
-  }, [])
+  }, [billingAccessPhase, openAccountSection, preferredLocale])
 
   const resetCustomerProfileState = useCallback(() => {
     setCustomerProfileHeight('')
@@ -1593,6 +1629,57 @@ function App() {
     const url = `${window.location.pathname}${window.location.search}${hash}`
     window.history.replaceState(null, '', url)
   }, [view])
+
+  useEffect(() => {
+    if (lastTrackedViewRef.current === view) {
+      return
+    }
+
+    lastTrackedViewRef.current = view
+
+    const pageTitle =
+      view === 'style'
+        ? 'Body Style Report'
+        : view === 'hair'
+          ? 'Hairstyling Recommendation'
+          : view === 'account'
+            ? 'Account & Access'
+            : view === 'terms'
+              ? 'Terms of Service'
+              : view === 'refunds'
+                ? 'Refund Policy'
+                : view === 'privacy'
+                  ? 'Privacy Policy'
+                  : 'Home'
+    const pagePath = view === 'home' ? '/' : `/${view}`
+    const pageLocation = `${window.location.origin}${window.location.pathname}${window.location.search}${view === 'home' ? '' : `#${view}`}`
+
+    trackPageView({
+      page_title: pageTitle,
+      page_path: pagePath,
+      page_location: pageLocation,
+      language: preferredLocale,
+    })
+
+    if (view === 'home') {
+      trackEvent('view_item_list', {
+        item_list_id: HOME_ITEM_LIST_ID,
+        item_list_name: HOME_ITEM_LIST_NAME,
+        items: getHomeRecommendationItems(),
+        ui_locale: preferredLocale,
+      })
+      return
+    }
+
+    if (view === 'style' || view === 'hair') {
+      trackEvent('view_item', {
+        items: [buildFeatureItem(view)],
+        entry_flow: view,
+        access_type: analyticsAccessType,
+        ui_locale: preferredLocale,
+      })
+    }
+  }, [analyticsAccessType, preferredLocale, view])
 
   useEffect(() => {
     return () => {
@@ -1818,6 +1905,39 @@ function App() {
 
   const clearPendingEntryView = () => {
     window.localStorage.removeItem(PENDING_ENTRY_VIEW_KEY)
+  }
+
+  const persistPendingCheckoutSource = (source: CheckoutSource) => {
+    window.localStorage.setItem(PENDING_CHECKOUT_SOURCE_KEY, source)
+  }
+
+  const readPendingCheckoutSource = (): CheckoutSource | null => {
+    const rawValue = window.localStorage.getItem(PENDING_CHECKOUT_SOURCE_KEY)
+
+    if (rawValue === 'style' || rawValue === 'hair' || rawValue === 'subscription') {
+      return rawValue
+    }
+
+    return null
+  }
+
+  const clearPendingCheckoutSource = () => {
+    window.localStorage.removeItem(PENDING_CHECKOUT_SOURCE_KEY)
+  }
+
+  const trackAnalyticsOnce = (
+    eventKey: string,
+    eventName: string,
+    params: Record<string, unknown>,
+  ) => {
+    const storageKey = `analytics_once:${eventKey}`
+
+    if (window.sessionStorage.getItem(storageKey) === 'true') {
+      return
+    }
+
+    window.sessionStorage.setItem(storageKey, 'true')
+    trackEvent(eventName, params)
   }
 
   const handleGoogleSignIn = async () => {
@@ -2558,6 +2678,11 @@ function App() {
         setBillingCustomerEmail(data.customerEmail.trim())
       }
 
+      trackEvent('subscription_portal_opened', {
+        subscription_status: billingAccessPhase,
+        ui_locale: preferredLocale,
+      })
+
       window.location.href = data.url
     } catch (error) {
       setSubscriptionActionTone('error')
@@ -2586,6 +2711,11 @@ function App() {
       return
     }
 
+    trackEvent('subscription_cancellation_requested', {
+      subscription_status: billingAccessPhase,
+      ui_locale: preferredLocale,
+    })
+
     try {
       setIsSubscriptionCanceling(true)
       setSubscriptionActionMessage('')
@@ -2611,6 +2741,10 @@ function App() {
       setSubscriptionActionMessage(
         data?.message ?? copy.accountSubscriptionCancelNote,
       )
+      trackEvent('subscription_cancellation_scheduled', {
+        subscription_status: data?.subscriptionStatus ?? billingAccessPhase,
+        ui_locale: preferredLocale,
+      })
       setCheckoutStatus(data?.hasAccess ? 'verified' : 'idle')
       setCheckoutStatusMessage(
         data?.hasAccess ? copy.accountSubscriptionCancelNote : '',
@@ -2706,6 +2840,10 @@ function App() {
       setStylePhotoName(payload.photoName)
       setHeight(payload.height)
       setWeight(payload.weight)
+      trackEvent('report_generation_started', {
+        report_kind: 'style',
+        ui_locale: preferredLocale,
+      })
 
       const response = await fetchWithAuth('/api/style-report', {
         method: 'POST',
@@ -2744,6 +2882,12 @@ function App() {
         setStyleResultImage(styleImageDataUrl)
       }
 
+      trackEvent('report_generated', {
+        report_kind: 'style',
+        result_mode: styleImageDataUrl ? 'image_and_text' : 'text_only',
+        ui_locale: preferredLocale,
+      })
+
       void requestReportEmail({
         kind: 'style',
         toEmail: deliveryEmail,
@@ -2756,6 +2900,10 @@ function App() {
         setTone: setStyleEmailTone,
       })
     } catch (error) {
+      trackEvent('report_generation_failed', {
+        report_kind: 'style',
+        ui_locale: preferredLocale,
+      })
       const fallback = copy.styleFetchError
       setStyleErrorMessage(error instanceof Error ? error.message : fallback)
     } finally {
@@ -2781,6 +2929,10 @@ function App() {
       setView('hair')
       setHairPhotoPreview(payload.previewUrl)
       setHairPhotoName(payload.photoName)
+      trackEvent('report_generation_started', {
+        report_kind: 'hair',
+        ui_locale: preferredLocale,
+      })
 
       const response = await fetchWithAuth('/api/hairstyle-grid', {
         method: 'POST',
@@ -2817,6 +2969,12 @@ function App() {
         setHairResultImage(hairImageDataUrl)
       }
 
+      trackEvent('report_generated', {
+        report_kind: 'hair',
+        result_mode: data.mode === 'image' ? 'image_grid' : 'prompt_only',
+        ui_locale: preferredLocale,
+      })
+
       void requestReportEmail({
         kind: 'hair',
         toEmail: deliveryEmail,
@@ -2829,6 +2987,10 @@ function App() {
         setTone: setHairEmailTone,
       })
     } catch (error) {
+      trackEvent('report_generation_failed', {
+        report_kind: 'hair',
+        ui_locale: preferredLocale,
+      })
       const fallback = copy.hairFetchError
       setHairErrorMessage(error instanceof Error ? error.message : fallback)
     } finally {
@@ -2917,9 +3079,22 @@ function App() {
         deliveryEmail = accessSnapshot?.customerEmail || deliveryEmail
       }
 
+      trackEvent('report_request_submitted', {
+        report_kind: 'style',
+        has_access: hasAccess,
+        access_type: hasAccess ? analyticsAccessType : 'locked',
+        ui_locale: preferredLocale,
+      })
+
       if (!hasAccess) {
         persistPendingCheckout(payload)
+        trackEvent('report_request_paywalled', {
+          report_kind: 'style',
+          entry_flow: 'style',
+          ui_locale: preferredLocale,
+        })
         await startCheckout('one_time', {
+          source: 'style',
           onError: (message) => setStyleErrorMessage(message),
         })
         return
@@ -2970,9 +3145,22 @@ function App() {
         deliveryEmail = accessSnapshot?.customerEmail || deliveryEmail
       }
 
+      trackEvent('report_request_submitted', {
+        report_kind: 'hair',
+        has_access: hasAccess,
+        access_type: hasAccess ? analyticsAccessType : 'locked',
+        ui_locale: preferredLocale,
+      })
+
       if (!hasAccess) {
         persistPendingCheckout(payload)
+        trackEvent('report_request_paywalled', {
+          report_kind: 'hair',
+          entry_flow: 'hair',
+          ui_locale: preferredLocale,
+        })
         await startCheckout('one_time', {
+          source: 'hair',
           onError: (message) => setHairErrorMessage(message),
         })
         return
@@ -3203,7 +3391,15 @@ function App() {
 
       setTone('success')
       setMessage(data.message ?? '')
+      trackEvent('report_email_sent', {
+        report_kind: kind,
+        ui_locale: preferredLocale,
+      })
     } catch (error) {
+      trackEvent('report_email_failed', {
+        report_kind: kind,
+        ui_locale: preferredLocale,
+      })
       setTone('error')
       setMessage(
         error instanceof Error ? error.message : copy.emailSendUnavailable,
@@ -3368,6 +3564,15 @@ function App() {
   }
 
   const beginProtectedEntry = async (targetView: ProtectedView) => {
+    trackEvent('select_item', {
+      item_list_id: HOME_ITEM_LIST_ID,
+      item_list_name: HOME_ITEM_LIST_NAME,
+      items: [buildFeatureItem(targetView)],
+      entry_flow: targetView,
+      access_type: analyticsAccessType,
+      ui_locale: preferredLocale,
+    })
+
     if (!hasAuthConfig) {
       setAuthFeedback('error', copy.authConfigMissing)
       setView('account')
@@ -3404,6 +3609,7 @@ function App() {
     clearPendingCheckout()
     persistPendingEntryView(targetView)
     await startCheckout('one_time', {
+      source: targetView,
       onError: (message) => {
         if (targetView === 'style') {
           setStyleErrorMessage(message)
@@ -3419,6 +3625,7 @@ function App() {
     checkoutKind: CheckoutKind,
     options?: {
       onError?: (message: string) => void
+      source?: CheckoutSource
     },
   ) => {
     if (!hasAuthConfig) {
@@ -3442,6 +3649,10 @@ function App() {
     try {
       setIsCheckoutLoading(true)
       setActiveCheckoutKind(checkoutKind)
+
+      if (options?.source) {
+        persistPendingCheckoutSource(options.source)
+      }
 
       if (checkoutKind === 'subscription') {
         setCheckoutErrorMessage('')
@@ -3469,6 +3680,25 @@ function App() {
         throw new Error(data?.error ?? fallbackMessage)
       }
 
+      const checkoutSource = options?.source ?? readPendingCheckoutSource()
+
+      trackEvent('begin_checkout', {
+        items: [
+          buildCheckoutItem({
+            checkoutKind,
+            entryFlow:
+              checkoutKind === 'subscription'
+                ? 'subscription'
+                : checkoutSource === 'style' || checkoutSource === 'hair'
+                  ? checkoutSource
+                  : null,
+          }),
+        ],
+        checkout_kind: checkoutKind,
+        entry_flow: checkoutSource ?? undefined,
+        ui_locale: preferredLocale,
+      })
+
       window.location.href = data.url
     } catch (error) {
       const message =
@@ -3480,6 +3710,10 @@ function App() {
 
       if (checkoutKind === 'subscription') {
         setCheckoutErrorMessage(message)
+      }
+
+      if (options?.source) {
+        clearPendingCheckoutSource()
       }
 
       options?.onError?.(message)
@@ -3535,14 +3769,34 @@ function App() {
 
         if (data.checkoutKind === 'one_time') {
           if (data.status === 'succeeded' && data.hasAccess) {
+            const pendingCheckout = readPendingCheckout()
+            const pendingEntryView = readPendingEntryView()
+            const pendingCheckoutSource = readPendingCheckoutSource()
+            const entryFlow =
+              pendingCheckout?.kind ?? pendingEntryView ?? pendingCheckoutSource ?? undefined
+            const transactionId = data.orderId || checkoutId
+
+            trackAnalyticsOnce(`purchase:${transactionId}`, 'purchase', {
+              transaction_id: transactionId,
+              items: [
+                buildCheckoutItem({
+                  checkoutKind: 'one_time',
+                  entryFlow:
+                    entryFlow === 'style' || entryFlow === 'hair' ? entryFlow : null,
+                }),
+              ],
+              checkout_kind: 'one_time',
+              entry_flow: entryFlow,
+              access_type: 'one_time',
+              ui_locale: preferredLocale,
+            })
+
             setIsPurchaseVerified(true)
             setPurchaseOrderId(data.orderId ?? '')
             setPurchaseEmail(data.customerEmail ?? authenticatedEmail)
-
-            const pendingCheckout = readPendingCheckout()
-            const pendingEntryView = readPendingEntryView()
             clearPendingCheckout()
             clearPendingEntryView()
+            clearPendingCheckoutSource()
             setActiveCheckoutKind(null)
             setIsCheckoutLoading(false)
             clearCheckoutQuery()
@@ -3566,10 +3820,41 @@ function App() {
           hasAccess,
         )
 
+        const transactionId = data.orderId || checkoutId
+
+        if (data.status === 'succeeded' && hasAccess) {
+          trackAnalyticsOnce(`purchase:${transactionId}`, 'purchase', {
+            transaction_id: transactionId,
+            items: [
+              buildCheckoutItem({
+                checkoutKind: 'subscription',
+                entryFlow: 'subscription',
+                subscriptionStatus: nextPhase === 'trialing' ? 'trialing' : 'active',
+              }),
+            ],
+            checkout_kind: 'subscription',
+            entry_flow: 'subscription',
+            access_type:
+              nextPhase === 'trialing' ? 'subscription_trial' : 'subscription_active',
+            subscription_status: nextPhase,
+            ui_locale: preferredLocale,
+          })
+
+          trackAnalyticsOnce(
+            `${nextPhase === 'trialing' ? 'trial_started' : 'subscription_activated'}:${transactionId}`,
+            nextPhase === 'trialing' ? 'trial_started' : 'subscription_activated',
+            {
+              subscription_status: nextPhase,
+              ui_locale: preferredLocale,
+            },
+          )
+        }
+
         applyBillingSnapshot(data)
         setActiveCheckoutKind(null)
         setIsCheckoutLoading(false)
         setCheckoutErrorMessage('')
+        clearPendingCheckoutSource()
         clearCheckoutQuery()
 
         if (data.status === 'succeeded' && hasAccess) {
@@ -4011,7 +4296,14 @@ function App() {
                       className="utility-button checkout-button"
                       disabled={isCheckoutLoading && activeCheckoutKind === 'subscription'}
                       onClick={() => {
-                        void startCheckout('subscription')
+                        trackEvent('select_promotion', {
+                          promotion_id: SUBSCRIPTION_PROMOTION_ID,
+                          promotion_name: SUBSCRIPTION_PROMOTION_NAME,
+                          creative_slot: SUBSCRIPTION_PROMOTION_SLOT,
+                          items: [buildSubscriptionPromotionItem()],
+                          ui_locale: preferredLocale,
+                        })
+                        void startCheckout('subscription', { source: 'subscription' })
                       }}
                       type="button"
                     >
