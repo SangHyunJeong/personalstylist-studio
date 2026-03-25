@@ -1,7 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
-
 :root {
-  font-family: 'Manrope', 'Pretendard', 'Noto Sans KR', sans-serif;
+  font-family: 'Manrope', 'Pretendard', 'Noto Sans KR', system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: #f8e9ed;
@@ -108,6 +106,7 @@ button {
 
 img {
   display: block;
+  max-width: 100%;
 }
 
 #root {

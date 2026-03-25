@@ -1,15 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
-import type {
-  CSSProperties,
-  ChangeEvent,
-  DragEvent,
-  FormEvent,
-  ReactNode,
-} from 'react'
+import type { ChangeEvent, DragEvent, FormEvent, ReactNode } from 'react'
 import type { Session, SupabaseClient } from '@supabase/supabase-js'
-import { toBlob } from 'html-to-image'
-import { policyDocuments, type PolicyView as LegalView } from './legalContent'
-import { loadSupabaseClient } from './supabase'
+import type { PolicyDocument, PolicyView as LegalView } from './legalContent'
 import {
   HOME_ITEM_LIST_ID,
   HOME_ITEM_LIST_NAME,
@@ -157,12 +149,7 @@ type AuthMode = 'sign-in' | 'sign-up'
 type AccountSection = 'subscription' | 'profile' | 'password' | 'delete'
 type StatusTone = 'success' | 'error' | 'fallback'
 type View = 'home' | 'style' | 'hair' | 'account' | LegalView
-
-const homeStyleImage =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuDQjx-vParhC1dothBqJzuH356lz73-3ubERqUoT5vD7PVP-6JWbDUJOmUiF7xHQu1a3AvUMNrHW-RYaRmRSLlWsZejfRc9IkyHIB5x0r7TScYE-OT3lXUhRyl5r37cDOMlynoU9NXuA65unD52y31OY7Q-ni6AFAwrRSWbYU98PSLxaWZvysgx72USxcVwLNYX3C9CaPR5qmcmow2iAt1Eupi0iZPhBPUyf8z_xepgOug3zcHgSv_QMSD1qZRtUY9T5DSq1mVQrS0P'
-
-const homeHairImage =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuCiSoCbdZuRJXGn4Kar-8Sh8WklP3L-cazvB65L2O-j9SDHoSd2DGfiznQyEpdI_JEZEkTKsoK9tkDC_HwU03HvOSayIiYsiUnoZLr9bbYrj-SDFS-3Yi5Ta8VVZCQB0B2ZgNvncqijcLi6l2T22UzdyOUKEdlD4ZACHKAIRA2AVFUpLVuPWL1RrR0hqAK8bGBc-U6yjKz5NihvIWvV4WuqWfYspWoWrYPUkhuUzxf_UMnLMJA2-NFcnaxo7EKcfJOnOjTNIvVIMg5I'
+type PolicyDocumentsByLocale = Record<Language, Record<LegalView, PolicyDocument>>
 
 const PURCHASE_VERIFIED_KEY = 'polar_purchase_verified'
 const PURCHASE_ORDER_ID_KEY = 'polar_purchase_order_id'
@@ -917,10 +904,6 @@ const localeCopy = {
   },
 } as const
 
-const backgroundStyle = (imageUrl: string): CSSProperties => ({
-  backgroundImage: `linear-gradient(180deg, transparent 0%, rgba(17, 6, 11, 0.22) 100%), url("${imageUrl}")`,
-})
-
 const Icon = ({
   children,
   className = '',
@@ -1185,6 +1168,8 @@ function App() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const [language, setLanguage] = useState<Language>(getInitialLanguage)
   const [view, setView] = useState<View>(getInitialView)
+  const [policyDocumentsByLocale, setPolicyDocumentsByLocale] =
+    useState<PolicyDocumentsByLocale | null>(null)
   const styleReportCaptureRef = useRef<HTMLElement | null>(null)
   const hairReportCaptureRef = useRef<HTMLElement | null>(null)
   const lastTrackedViewRef = useRef<View | null>(null)
@@ -1293,7 +1278,7 @@ function App() {
   const [hairEmailTone, setHairEmailTone] = useState<StatusTone>('success')
   const [isHairEmailSending, setIsHairEmailSending] = useState(false)
   const copy = localeCopy[language]
-  const policyCopy = policyDocuments[language]
+  const policyCopy = policyDocumentsByLocale?.[language] ?? null
   const preferredLocale = language === 'ko' ? 'ko-KR' : 'en-US'
   const authenticatedEmail = authSession?.user.email ?? ''
   const isAuthenticated = Boolean(authSession?.user)
@@ -1479,52 +1464,83 @@ function App() {
   }, [language])
 
   useEffect(() => {
-    let isCancelled = false
-    let unsubscribe = () => {}
+    if (policyDocumentsByLocale || (view !== 'account' && !isPolicyView(view))) {
+      return
+    }
 
-    void loadSupabaseClient().then((client) => {
+    let isCancelled = false
+
+    void import('./legalContent').then(({ policyDocuments }) => {
       if (isCancelled) {
         return
       }
 
-      if (!client) {
+      setPolicyDocumentsByLocale(policyDocuments as PolicyDocumentsByLocale)
+    })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [policyDocumentsByLocale, view])
+
+  useEffect(() => {
+    let isCancelled = false
+    let unsubscribe = () => {}
+
+    void import('./supabase')
+      .then(({ loadSupabaseClient }) => loadSupabaseClient())
+      .then((client) => {
+        if (isCancelled) {
+          return
+        }
+
+        if (!client) {
+          setSupabaseClient(null)
+          setHasAuthConfig(false)
+          setIsAuthLoading(false)
+          return
+        }
+
+        setSupabaseClient(client)
+        setHasAuthConfig(true)
+
+        void client.auth.getSession().then(({ data, error }) => {
+          if (isCancelled) {
+            return
+          }
+
+          if (error) {
+            setAuthFeedback('error', error.message)
+          }
+
+          setAuthSession(data.session)
+          setIsAuthLoading(false)
+        })
+
+        const {
+          data: { subscription },
+        } = client.auth.onAuthStateChange((_event, nextSession) => {
+          if (isCancelled) {
+            return
+          }
+
+          setAuthSession(nextSession)
+          setIsAuthLoading(false)
+        })
+
+        unsubscribe = () => {
+          subscription.unsubscribe()
+        }
+      })
+      .catch(() => {
+        if (isCancelled) {
+          return
+        }
+
         setSupabaseClient(null)
         setHasAuthConfig(false)
         setIsAuthLoading(false)
-        return
-      }
-
-      setSupabaseClient(client)
-      setHasAuthConfig(true)
-
-      void client.auth.getSession().then(({ data, error }) => {
-        if (isCancelled) {
-          return
-        }
-
-        if (error) {
-          setAuthFeedback('error', error.message)
-        }
-
-        setAuthSession(data.session)
-        setIsAuthLoading(false)
       })
-
-      const {
-        data: { subscription },
-      } = client.auth.onAuthStateChange((_event, nextSession) => {
-        if (isCancelled) {
-          return
-        }
-
-        setAuthSession(nextSession)
-        setIsAuthLoading(false)
-      })
-
-      unsubscribe = () => {
-        subscription.unsubscribe()
-      }
-    })
 
     return () => {
       isCancelled = true
@@ -3417,6 +3433,7 @@ function App() {
       throw new Error(copy.reportImageExportError)
     }
 
+    const { toBlob } = await import('html-to-image')
     const blob = await toBlob(element, {
       cacheBust: true,
       pixelRatio: 2,
@@ -3903,7 +3920,7 @@ function App() {
   ])
 
   const activeNav = isPolicyView(view) ? 'account' : view
-  const currentPolicy = isPolicyView(view) ? policyCopy[view] : null
+  const currentPolicy = isPolicyView(view) ? policyCopy?.[view] ?? null : null
 
   const renderPhotoField = ({
     label,
@@ -4755,7 +4772,21 @@ function App() {
   )
 
   const renderPolicyPage = (policyView: LegalView) => {
-    const policy = policyCopy[policyView]
+    const policy = policyCopy?.[policyView]
+
+    if (!policy) {
+      return (
+        <section className="panel report-card policy-card">
+          <div className="report-card-header">
+            <span className="panel-tag">{copy.legalTag}</span>
+            <h3>{copy.legalLinksTitle}</h3>
+          </div>
+          <p className="rich-paragraph">
+            {language === 'ko' ? '약관 정보를 불러오는 중입니다.' : 'Loading the legal content...'}
+          </p>
+        </section>
+      )
+    }
 
     return (
       <section className="panel report-card policy-card">
@@ -4787,32 +4818,38 @@ function App() {
     )
   }
 
-  const renderPolicyLinks = () => (
-    <section className="policy-links-card">
-      <p className="policy-links-label">
-        <strong>{copy.legalLinksTitle}</strong>
-        <span>{copy.legalLinksDescription}</span>
-      </p>
-      <div className="policy-link-grid">
-        {policyViews.map((policyView) => {
-          const policy = policyCopy[policyView]
-          const isActive = view === policyView
+  const renderPolicyLinks = () => {
+    if (!policyCopy) {
+      return null
+    }
 
-          return (
-            <button
-              aria-current={isActive ? 'page' : undefined}
-              className={`policy-link-button ${isActive ? 'is-active' : ''}`}
-              key={policyView}
-              onClick={() => setView(policyView)}
-              type="button"
-            >
-              {policy.title}
-            </button>
-          )
-        })}
-      </div>
-    </section>
-  )
+    return (
+      <section className="policy-links-card">
+        <p className="policy-links-label">
+          <strong>{copy.legalLinksTitle}</strong>
+          <span>{copy.legalLinksDescription}</span>
+        </p>
+        <div className="policy-link-grid">
+          {policyViews.map((policyView) => {
+            const policy = policyCopy[policyView]
+            const isActive = view === policyView
+
+            return (
+              <button
+                aria-current={isActive ? 'page' : undefined}
+                className={`policy-link-button ${isActive ? 'is-active' : ''}`}
+                key={policyView}
+                onClick={() => setView(policyView)}
+                type="button"
+              >
+                {policy.title}
+              </button>
+            )
+          })}
+        </div>
+      </section>
+    )
+  }
 
   const renderReportActions = ({
     hasContent,
@@ -4991,11 +5028,19 @@ function App() {
                   }}
                   type="button"
                 >
-                  <div
-                    aria-hidden="true"
-                    className="selection-visual"
-                    style={backgroundStyle(homeStyleImage)}
-                  />
+                  <div aria-hidden="true" className="selection-visual selection-visual-style">
+                    <div className="selection-orb selection-orb-style-primary" />
+                    <div className="selection-orb selection-orb-style-secondary" />
+                    <div className="selection-dashboard">
+                      <span className="selection-line selection-line-long" />
+                      <span className="selection-line selection-line-medium" />
+                      <div className="selection-pill-row">
+                        <span className="selection-pill" />
+                        <span className="selection-pill selection-pill-accent" />
+                        <span className="selection-pill" />
+                      </div>
+                    </div>
+                  </div>
                   <div className="selection-content">
                     <div className="selection-heading">
                       <h3>{copy.homeStyleTitle}</h3>
@@ -5016,11 +5061,15 @@ function App() {
                   }}
                   type="button"
                 >
-                  <div
-                    aria-hidden="true"
-                    className="selection-visual"
-                    style={backgroundStyle(homeHairImage)}
-                  />
+                  <div aria-hidden="true" className="selection-visual selection-visual-hair">
+                    <div className="selection-orb selection-orb-hair-primary" />
+                    <div className="selection-orb selection-orb-hair-secondary" />
+                    <div className="selection-grid-visual">
+                      {Array.from({ length: 9 }, (_, index) => (
+                        <span className="selection-grid-cell" key={`hair-grid-${index}`} />
+                      ))}
+                    </div>
+                  </div>
                   <div className="selection-content">
                     <div className="selection-heading">
                       <h3>{copy.homeHairTitle}</h3>

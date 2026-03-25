@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Personal AI Stylist">
+  <defs>
+    <linearGradient id="g" x1="12" x2="52" y1="10" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff5f93" />
+      <stop offset="1" stop-color="#ff9561" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="#17070d" />
+  <circle cx="32" cy="32" r="19" fill="url(#g)" opacity="0.18" />
+  <path d="M23 19h12.8c7.1 0 11.2 3.7 11.2 9.7 0 4.7-2.4 7.8-6.6 9l7.5 8.3H39l-6.3-7.4h-1.9V46H23V19Zm7.8 13.5h4.1c2.7 0 4.3-1.3 4.3-3.5s-1.6-3.4-4.3-3.4h-4.1v6.9Z" fill="#fff7f9" />
+</svg>
