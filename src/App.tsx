@@ -5387,46 +5387,48 @@ function App() {
         </main>
 
         <nav className="bottom-nav">
-          {navItems.map((item) => {
-            const IconComponent = item.icon
-            const isActive = activeNav === item.key
+          <div className="bottom-nav-inner">
+            {navItems.map((item) => {
+              const IconComponent = item.icon
+              const isActive = activeNav === item.key
 
-            const handleClick = () => {
-              if (item.key === 'home') {
-                setView('home')
-                return
+              const handleClick = () => {
+                if (item.key === 'home') {
+                  setView('home')
+                  return
+                }
+
+                if (item.key === 'style' || item.key === 'hair') {
+                  void beginProtectedEntry(item.key)
+                  return
+                }
+
+                if (item.key === 'account') {
+                  setView('account')
+                }
               }
 
-              if (item.key === 'style' || item.key === 'hair') {
-                void beginProtectedEntry(item.key)
-                return
-              }
-
-              if (item.key === 'account') {
-                setView('account')
-              }
-            }
-
-            return (
-              <button
-                className={`nav-item ${isActive ? 'is-active' : ''}`}
-                key={item.key}
-                onClick={handleClick}
-                type="button"
-              >
-                <IconComponent className="nav-icon" />
-                <span>
-                  {item.key === 'home'
-                    ? copy.navHome
-                    : item.key === 'style'
-                      ? copy.navStyle
-                      : item.key === 'hair'
-                        ? copy.navHair
-                        : copy.navAccount}
-                </span>
-              </button>
-            )
-          })}
+              return (
+                <button
+                  className={`nav-item ${isActive ? 'is-active' : ''}`}
+                  key={item.key}
+                  onClick={handleClick}
+                  type="button"
+                >
+                  <IconComponent className="nav-icon" />
+                  <span>
+                    {item.key === 'home'
+                      ? copy.navHome
+                      : item.key === 'style'
+                        ? copy.navStyle
+                        : item.key === 'hair'
+                          ? copy.navHair
+                          : copy.navAccount}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </nav>
       </div>
     </div>
