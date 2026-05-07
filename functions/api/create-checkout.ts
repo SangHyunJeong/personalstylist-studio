@@ -3,7 +3,9 @@ import {
   POLAR_ONE_TIME_PRODUCT_ID,
   POLAR_SUBSCRIPTION_PRODUCT_ID,
   extractPolarErrorMessage,
+  getPolarAuthErrorMessage,
   getBaseApiUrl,
+  isPolarAuthErrorStatus,
   type PolarApiErrorResponse,
 } from './_polarBilling'
 
@@ -89,10 +91,8 @@ const getLocalizedPolarCheckoutFallback = ({
 }) => {
   const isKo = isKoreanLocale(preferredLocale)
 
-  if (status === 401 || status === 403) {
-    return isKo
-      ? 'Polar 액세스 토큰이 없거나 만료되었거나 checkouts:write 권한이 없습니다.'
-      : 'The Polar access token is missing, expired, or does not have the checkouts:write scope.'
+  if (isPolarAuthErrorStatus(status)) {
+    return getPolarAuthErrorMessage(preferredLocale)
   }
 
   if (status === 422) {
@@ -276,13 +276,18 @@ export async function onRequestPost(context: PagesContext) {
 
     return jsonResponse(
       {
-        error:
-          polarErrorMessage ||
-          getLocalizedPolarCheckoutFallback({
-            preferredLocale,
-            checkoutKind,
-            status: polarResponse.status,
-          }),
+        error: isPolarAuthErrorStatus(polarResponse.status)
+          ? getLocalizedPolarCheckoutFallback({
+              preferredLocale,
+              checkoutKind,
+              status: polarResponse.status,
+            })
+          : polarErrorMessage ||
+            getLocalizedPolarCheckoutFallback({
+              preferredLocale,
+              checkoutKind,
+              status: polarResponse.status,
+            }),
       },
       polarResponse.status || 500,
     )

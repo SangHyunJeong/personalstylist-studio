@@ -4,7 +4,10 @@ import {
   deriveBillingAccessFromCustomerState,
   extractPolarErrorMessage,
   fetchPolarCustomerStateForIdentity,
+  getPolarAuthErrorMessage,
   getBaseApiUrl,
+  isPolarAuthErrorStatus,
+  logPolarApiError,
   parsePolarJson,
   type PolarApiErrorResponse,
   type PolarCustomerStateResponse,
@@ -91,16 +94,25 @@ export async function onRequestPost(context: PagesContext) {
     const errorMessage = extractPolarErrorMessage(
       customerState.json as PolarApiErrorResponse | null,
     )
+    const status = customerState.response.status || 500
+
+    logPolarApiError({
+      operation: 'cancel-subscription.fetchCustomerState',
+      status,
+      server: env.POLAR_SERVER,
+      polarMessage: errorMessage || undefined,
+    })
 
     return jsonResponse(
       {
-        error:
-          errorMessage ||
-          (isKoreanLocale(preferredLocale)
-            ? '구독 상태를 확인하지 못했습니다.'
-            : 'Unable to verify the subscription state.'),
+        error: isPolarAuthErrorStatus(status)
+          ? getPolarAuthErrorMessage(preferredLocale)
+          : errorMessage ||
+            (isKoreanLocale(preferredLocale)
+              ? '구독 상태를 확인하지 못했습니다.'
+              : 'Unable to verify the subscription state.'),
       },
-      customerState.response.status || 500,
+      status,
     )
   }
 
@@ -130,16 +142,25 @@ export async function onRequestPost(context: PagesContext) {
     const errorMessage = extractPolarErrorMessage(
       session.json as PolarApiErrorResponse | null,
     )
+    const status = session.response.status || 500
+
+    logPolarApiError({
+      operation: 'cancel-subscription.createCustomerSession',
+      status,
+      server: env.POLAR_SERVER,
+      polarMessage: errorMessage || undefined,
+    })
 
     return jsonResponse(
       {
-        error:
-          errorMessage ||
-          (isKoreanLocale(preferredLocale)
-            ? '구독 해지 세션을 만들지 못했습니다.'
-            : 'Unable to create the subscription cancellation session.'),
+        error: isPolarAuthErrorStatus(status)
+          ? getPolarAuthErrorMessage(preferredLocale)
+          : errorMessage ||
+            (isKoreanLocale(preferredLocale)
+              ? '구독 해지 세션을 만들지 못했습니다.'
+              : 'Unable to create the subscription cancellation session.'),
       },
-      session.response.status || 500,
+      status,
     )
   }
 

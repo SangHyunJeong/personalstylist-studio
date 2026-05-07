@@ -3,7 +3,10 @@ import {
   deriveBillingAccessFromCustomerState,
   extractPolarErrorMessage,
   fetchPolarCustomerStateForIdentity,
+  getPolarAuthErrorMessage,
   getBaseApiUrl,
+  isPolarAuthErrorStatus,
+  logPolarApiError,
   parsePolarJson,
   POLAR_ONE_TIME_PRODUCT_ID,
   POLAR_SUBSCRIPTION_PRODUCT_ID,
@@ -94,15 +97,28 @@ export async function onRequestGet(context: PagesContext) {
   const polarJson = await parsePolarJson<PolarCheckoutStatusResponse>(polarResponse)
 
   if (!polarResponse.ok || !polarJson?.status) {
+    const errorMessage = extractPolarErrorMessage(
+      polarJson as PolarApiErrorResponse | null,
+    )
+    const status = polarResponse.status || 500
+
+    logPolarApiError({
+      operation: 'checkout-status.fetchCheckout',
+      status,
+      server: env.POLAR_SERVER,
+      polarMessage: errorMessage || undefined,
+    })
+
     return jsonResponse(
       {
-        error:
-          polarJson?.error?.message ??
-          (isKoreanLocale(preferredLocale)
-            ? 'Polar checkout 상태를 확인하지 못했습니다.'
-            : 'Unable to verify the Polar checkout status.'),
+        error: isPolarAuthErrorStatus(status)
+          ? getPolarAuthErrorMessage(preferredLocale)
+          : errorMessage ||
+            (isKoreanLocale(preferredLocale)
+              ? 'Polar checkout 상태를 확인하지 못했습니다.'
+              : 'Unable to verify the Polar checkout status.'),
       },
-      polarResponse.status || 500,
+      status,
     )
   }
 
@@ -154,16 +170,25 @@ export async function onRequestGet(context: PagesContext) {
       const errorMessage = extractPolarErrorMessage(
         customerState.json as PolarApiErrorResponse | null,
       )
+      const status = customerState.response.status || 500
+
+      logPolarApiError({
+        operation: 'checkout-status.fetchCustomerState',
+        status,
+        server: env.POLAR_SERVER,
+        polarMessage: errorMessage || undefined,
+      })
 
       return jsonResponse(
         {
-          error:
-            errorMessage ||
-            (isKoreanLocale(preferredLocale)
-              ? 'Polar 구독 상태를 확인하지 못했습니다.'
-              : 'Unable to verify the Polar subscription state.'),
+          error: isPolarAuthErrorStatus(status)
+            ? getPolarAuthErrorMessage(preferredLocale)
+            : errorMessage ||
+              (isKoreanLocale(preferredLocale)
+                ? 'Polar 구독 상태를 확인하지 못했습니다.'
+                : 'Unable to verify the Polar subscription state.'),
         },
-        customerState.response.status || 500,
+        status,
       )
     } else {
       const accessSnapshot = deriveBillingAccessFromCustomerState({

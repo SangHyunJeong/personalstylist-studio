@@ -2,6 +2,9 @@ import { requireAuthenticatedUser } from './_supabaseAuth'
 import {
   createPolarCustomerSessionForIdentity,
   extractPolarErrorMessage,
+  getPolarAuthErrorMessage,
+  isPolarAuthErrorStatus,
+  logPolarApiError,
   type PolarApiErrorResponse,
 } from './_polarBilling'
 
@@ -83,16 +86,25 @@ export async function onRequestPost(context: PagesContext) {
     const errorMessage = extractPolarErrorMessage(
       session.json as PolarApiErrorResponse | null,
     )
+    const status = session.response.status || 500
+
+    logPolarApiError({
+      operation: 'customer-portal-session.createSession',
+      status,
+      server: env.POLAR_SERVER,
+      polarMessage: errorMessage || undefined,
+    })
 
     return jsonResponse(
       {
-        error:
-          errorMessage ||
-          (isKoreanLocale(preferredLocale)
-            ? '구독 관리 링크를 생성하지 못했습니다.'
-            : 'Unable to create the subscription management link.'),
+        error: isPolarAuthErrorStatus(status)
+          ? getPolarAuthErrorMessage(preferredLocale)
+          : errorMessage ||
+            (isKoreanLocale(preferredLocale)
+              ? '구독 관리 링크를 생성하지 못했습니다.'
+              : 'Unable to create the subscription management link.'),
       },
-      session.response.status || 500,
+      status,
     )
   }
 

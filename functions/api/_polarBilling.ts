@@ -114,6 +114,33 @@ export const extractPolarErrorMessage = (
   return payload.error?.message ?? ''
 }
 
+export const isPolarAuthErrorStatus = (status: number) =>
+  status === 401 || status === 403
+
+export const getPolarAuthErrorMessage = (preferredLocale?: string) =>
+  preferredLocale?.toLowerCase().startsWith('ko')
+    ? 'Polar 액세스 토큰이 없거나 만료되었거나 필요한 권한이 없습니다. 서버 환경변수 POLAR_ACCESS_TOKEN과 토큰 스코프를 확인해주세요.'
+    : 'The Polar access token is missing, expired, or does not have the required scope. Check the POLAR_ACCESS_TOKEN server environment variable and token scopes.'
+
+export const logPolarApiError = ({
+  operation,
+  status,
+  server,
+  polarMessage,
+}: {
+  operation: string
+  status: number
+  server?: string
+  polarMessage?: string
+}) => {
+  console.error('Polar API request failed', {
+    operation,
+    status,
+    polarServer: server === 'sandbox' ? 'sandbox' : 'production',
+    polarMessage,
+  })
+}
+
 const normalizeSubscriptionStatus = (status?: string) =>
   status?.trim().toLowerCase() ?? ''
 

@@ -3,6 +3,9 @@ import {
   deriveBillingAccessFromCustomerState,
   extractPolarErrorMessage,
   fetchPolarCustomerStateForIdentity,
+  getPolarAuthErrorMessage,
+  isPolarAuthErrorStatus,
+  logPolarApiError,
   type PolarApiErrorResponse,
   type PolarCustomerStateResponse,
 } from './_polarBilling'
@@ -70,16 +73,25 @@ export async function onRequestGet(context: PagesContext) {
     const errorMessage = extractPolarErrorMessage(
       customerState.json as PolarApiErrorResponse | null,
     )
+    const status = customerState.response.status || 500
+
+    logPolarApiError({
+      operation: 'customer-access.fetchCustomerState',
+      status,
+      server: env.POLAR_SERVER,
+      polarMessage: errorMessage || undefined,
+    })
 
     return jsonResponse(
       {
-        error:
-          errorMessage ||
-          (isKoreanLocale(preferredLocale)
-            ? 'Polar 구독 상태를 확인하지 못했습니다.'
-            : 'Unable to verify the Polar subscription state.'),
+        error: isPolarAuthErrorStatus(status)
+          ? getPolarAuthErrorMessage(preferredLocale)
+          : errorMessage ||
+            (isKoreanLocale(preferredLocale)
+              ? 'Polar 구독 상태를 확인하지 못했습니다.'
+              : 'Unable to verify the Polar subscription state.'),
       },
-      customerState.response.status || 500,
+      status,
     )
   }
 
