@@ -39,10 +39,7 @@ type GeminiResponse = {
   }
 }
 
-const IMAGE_MODELS = [
-  'gemini-2.5-flash-image',
-  'gemini-3.1-flash-image-preview',
-]
+const IMAGE_MODELS = ['gemini-3-pro-image-preview']
 
 const TEXT_FALLBACK_MODEL = 'gemini-3-flash-preview'
 
@@ -360,7 +357,7 @@ export async function onRequestPost(context: PagesContext) {
             },
           },
         ],
-        maxOutputTokens: 1536,
+        maxOutputTokens: 8192,
       })
 
       if (response.ok) {

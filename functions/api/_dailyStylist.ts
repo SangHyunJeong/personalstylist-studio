@@ -115,10 +115,7 @@ type InlineImageAsset = {
 
 const DEFAULT_FROM_EMAIL = 'Personal AI Stylist <noreply@personalstylist.site>'
 const GEMINI_TEXT_MODEL = 'gemini-3-flash-preview'
-const GEMINI_IMAGE_MODELS = [
-  'gemini-2.5-flash-image',
-  'gemini-3.1-flash-image-preview',
-]
+const GEMINI_IMAGE_MODELS = ['gemini-3-pro-image-preview']
 const DELIVERY_HOUR = 6
 const DELIVERY_WINDOW_MINUTES = 15
 
@@ -876,7 +873,7 @@ const generateDailyStyledImage = async ({
           },
         },
       ],
-      maxOutputTokens: 1536,
+      maxOutputTokens: 8192,
       temperature: 0.9,
     })
 
