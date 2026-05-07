@@ -131,8 +131,11 @@ const extractSubscriptionProductIds = (
   }
 
   for (const product of subscription.products ?? []) {
-    if (typeof product === 'string' && product) {
-      productIds.add(product)
+    if (typeof product === 'string') {
+      if (product) {
+        productIds.add(product)
+      }
+
       continue
     }
 

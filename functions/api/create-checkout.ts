@@ -2,7 +2,9 @@ import { requireAuthenticatedUser } from './_supabaseAuth'
 import {
   POLAR_ONE_TIME_PRODUCT_ID,
   POLAR_SUBSCRIPTION_PRODUCT_ID,
+  extractPolarErrorMessage,
   getBaseApiUrl,
+  type PolarApiErrorResponse,
 } from './_polarBilling'
 
 interface Env {
@@ -20,9 +22,14 @@ interface PagesContext {
 
 type PolarCheckoutResponse = {
   url?: string
-  error?: {
-    message?: string
-  }
+  error?: PolarApiErrorResponse['error']
+  detail?:
+    | string
+    | Array<{
+        loc?: Array<string | number>
+        msg?: string
+        type?: string
+      }>
 }
 
 const jsonResponse = (
@@ -33,10 +40,113 @@ const jsonResponse = (
 const isKoreanLocale = (preferredLocale?: string) =>
   preferredLocale?.toLowerCase().startsWith('ko') ?? false
 
+const getPolarServerLabel = (server?: string) =>
+  server === 'sandbox' ? 'sandbox' : 'production'
+
+const parsePolarCheckoutJson = (rawText: string) => {
+  if (!rawText.trim()) {
+    return null
+  }
+
+  try {
+    return JSON.parse(rawText) as PolarCheckoutResponse
+  } catch {
+    return null
+  }
+}
+
+const extractPolarCheckoutErrorMessage = (
+  payload: PolarCheckoutResponse | null,
+) => {
+  const standardError = extractPolarErrorMessage(payload)
+
+  if (standardError) {
+    return standardError
+  }
+
+  if (typeof payload?.detail === 'string') {
+    return payload.detail
+  }
+
+  if (Array.isArray(payload?.detail)) {
+    return payload.detail
+      .map((item) => item.msg)
+      .filter((message): message is string => Boolean(message))
+      .join('; ')
+  }
+
+  return ''
+}
+
+const getLocalizedPolarCheckoutFallback = ({
+  preferredLocale,
+  checkoutKind,
+  status,
+}: {
+  preferredLocale?: string
+  checkoutKind: 'one_time' | 'subscription'
+  status: number
+}) => {
+  const isKo = isKoreanLocale(preferredLocale)
+
+  if (status === 401 || status === 403) {
+    return isKo
+      ? 'Polar 액세스 토큰이 없거나 만료되었거나 checkouts:write 권한이 없습니다.'
+      : 'The Polar access token is missing, expired, or does not have the checkouts:write scope.'
+  }
+
+  if (status === 422) {
+    return isKo
+      ? 'Polar가 체크아웃 요청을 거부했습니다. POLAR_SERVER와 상품 ID가 같은 환경인지, products 필드에 Product ID를 보내는지 확인해주세요.'
+      : 'Polar rejected the checkout request. Verify POLAR_SERVER matches the product IDs and that the request sends Product IDs in the products field.'
+  }
+
+  return isKo
+    ? checkoutKind === 'subscription'
+      ? 'Polar 구독 체크아웃 세션을 생성하지 못했습니다.'
+      : 'Polar 결제 체크아웃 세션을 생성하지 못했습니다.'
+    : checkoutKind === 'subscription'
+      ? 'Unable to create the Polar subscription checkout session.'
+      : 'Unable to create the Polar one-time checkout session.'
+}
+
+const logPolarCheckoutError = ({
+  message,
+  status,
+  checkoutKind,
+  productId,
+  server,
+  polarMessage,
+  rawText,
+}: {
+  message: string
+  status?: number
+  checkoutKind: 'one_time' | 'subscription'
+  productId: string
+  server?: string
+  polarMessage?: string
+  rawText?: string
+}) => {
+  console.error('Polar checkout creation failed', {
+    message,
+    status,
+    checkoutKind,
+    productId,
+    polarServer: getPolarServerLabel(server),
+    polarMessage,
+    rawResponse: rawText?.slice(0, 1000),
+  })
+}
+
 export async function onRequestPost(context: PagesContext) {
   const { request, env } = context
 
   if (!env.POLAR_ACCESS_TOKEN) {
+    console.error('Polar checkout configuration error', {
+      message: 'POLAR_ACCESS_TOKEN is not configured.',
+      polarServer: getPolarServerLabel(env.POLAR_SERVER),
+    })
+
     return jsonResponse(
       {
         error: 'Polar access token is not configured on the server.',
@@ -105,43 +215,74 @@ export async function onRequestPost(context: PagesContext) {
   successUrl.searchParams.set('checkout', 'success')
   successUrl.searchParams.set('checkout_id', '{CHECKOUT_ID}')
 
-  const polarResponse = await fetch(`${getBaseApiUrl(env.POLAR_SERVER)}/v1/checkouts/`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`,
-      'Content-Type': 'application/json',
+  const polarCheckoutPayload = {
+    products: [productId],
+    customer_email: authenticatedUser.email,
+    external_customer_id: authenticatedUser.id,
+    metadata: {
+      supabase_user_id: authenticatedUser.id,
+      checkout_kind: checkoutKind,
     },
-    body: JSON.stringify({
-      products: [productId],
-      customer_email: authenticatedUser.email,
-      external_customer_id: authenticatedUser.id,
-      metadata: {
-        supabase_user_id: authenticatedUser.id,
-        checkout_kind: checkoutKind,
+    success_url: successUrl.toString(),
+    return_url: returnUrl.toString(),
+    locale: isKoreanLocale(preferredLocale) ? 'ko' : 'en',
+  }
+
+  let polarResponse: Response
+
+  try {
+    polarResponse = await fetch(`${getBaseApiUrl(env.POLAR_SERVER)}/v1/checkouts`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.POLAR_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
       },
-      success_url: successUrl.toString(),
-      return_url: returnUrl.toString(),
-      locale: isKoreanLocale(preferredLocale) ? 'ko' : 'en',
-    }),
-  })
+      body: JSON.stringify(polarCheckoutPayload),
+    })
+  } catch (error) {
+    logPolarCheckoutError({
+      message: error instanceof Error ? error.message : 'Polar request failed.',
+      checkoutKind,
+      productId,
+      server: env.POLAR_SERVER,
+    })
+
+    return jsonResponse(
+      {
+        error: isKoreanLocale(preferredLocale)
+          ? 'Polar 체크아웃 API에 연결하지 못했습니다.'
+          : 'Unable to reach the Polar checkout API.',
+      },
+      502,
+    )
+  }
 
   const rawText = await polarResponse.text()
-  const polarJson = rawText.trim()
-    ? (JSON.parse(rawText) as PolarCheckoutResponse)
-    : null
+  const polarJson = parsePolarCheckoutJson(rawText)
+  const polarErrorMessage = extractPolarCheckoutErrorMessage(polarJson)
 
   if (!polarResponse.ok || !polarJson?.url) {
+    logPolarCheckoutError({
+      message: !polarResponse.ok
+        ? 'Polar returned an error response.'
+        : 'Polar response did not include a checkout URL.',
+      status: polarResponse.status,
+      checkoutKind,
+      productId,
+      server: env.POLAR_SERVER,
+      polarMessage: polarErrorMessage || undefined,
+      rawText,
+    })
+
     return jsonResponse(
       {
         error:
-          polarJson?.error?.message ??
-          (isKoreanLocale(preferredLocale)
-            ? checkoutKind === 'subscription'
-              ? 'Polar 구독 체크아웃 세션을 생성하지 못했습니다.'
-              : 'Polar 결제 체크아웃 세션을 생성하지 못했습니다.'
-            : checkoutKind === 'subscription'
-              ? 'Unable to create the Polar subscription checkout session.'
-              : 'Unable to create the Polar one-time checkout session.'),
+          polarErrorMessage ||
+          getLocalizedPolarCheckoutFallback({
+            preferredLocale,
+            checkoutKind,
+            status: polarResponse.status,
+          }),
       },
       polarResponse.status || 500,
     )
